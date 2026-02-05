@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:DIE-{###}",
+ "creation": "2026-02-04 12:29:18.307251",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "range_of_size",
+  "od",
+  "id"
+ ],
+ "fields": [
+  {
+   "fieldname": "range_of_size",
+   "fieldtype": "Select",
+   "label": "Range of Size",
+   "options": "\n1 to 50\n51 to 100\n101 to 150\n151 to 200\n201 to 250\n251 to 300\n301 to 350\n351 to 400\n401 to 450\n451 to 500\n501 to 550\n551 to 600\n601 to 650\n651 to 700\n701 to 750\n751 to 800\n801 to 900"
+  },
+  {
+   "fieldname": "od",
+   "fieldtype": "Float",
+   "label": "OD"
+  },
+  {
+   "fieldname": "id",
+   "fieldtype": "Float",
+   "label": "ID"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-05 11:05:28.982942",
+ "modified_by": "Administrator",
+ "module": "Fluorotech",
+ "name": "Die Details",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
