@@ -60,6 +60,45 @@ frappe.ui.form.on("Work Order", {
     
     custom_sub_work_order_type(frm) { 
         update_item_values(frm, false); 
+    },
+    custom_moulding_completed(frm) {
+        if (frm.doc.custom_moulding_completed) {
+            frm.set_value('custom_moulding_completed_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_moulding_completed_date', '');
+        }
+    },
+    
+    custom__sintering_completed(frm) {
+        if (frm.doc.custom__sintering_completed) {
+            frm.set_value('custom_sintering_completed_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_sintering_completed_date', '');
+        }
+    },
+    
+    custom_post_cooling_completed(frm) {
+        if (frm.doc.custom_post_cooling_completed) {
+            frm.set_value('custom_post_cooling_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_post_cooling_date', '');
+        }
+    },
+    
+    custom_straightening_completed(frm) {
+        if (frm.doc.custom_straightening_completed) {
+            frm.set_value('custom_straightening_completed_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_straightening_completed_date', '');
+        }
+    },
+    
+    custom_return_to_moulding_stage(frm) {
+        if (frm.doc.custom_return_to_moulding_stage) {
+            frm.set_value('custom_return_to_moulding_stage_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_return_to_moulding_stage_date', '');
+        }
     }
 });
 
@@ -161,6 +200,22 @@ function calculate_pressure_in_kg(frm) {
     calculate_pressure(frm, 'custom_pressure_in_kg', 'custom_material_pressure_two', 'custom_press_mc_no');
 }
 
+// function calculate_weight(frm) {
+//     let {custom_od: od, custom_id: id, custom_length_: length, custom_density: density} = frm.doc;
+    
+//     if (!od || !id || !length || !density) return;
+    
+//     frappe.call({
+//         method: 'fluorotech_custom.config.py.work_order.weight',
+//         args: {od, id, length, density},
+//         callback: function(r) {
+//             if (r.message) {
+//                 frm.set_value('custom_weight', r.message / 10);
+//             }
+//         }
+//     });
+// }
+
 function calculate_weight(frm) {
     let {custom_od: od, custom_id: id, custom_length_: length, custom_density: density} = frm.doc;
     
@@ -171,7 +226,8 @@ function calculate_weight(frm) {
         args: {od, id, length, density},
         callback: function(r) {
             if (r.message) {
-                frm.set_value('custom_weight', r.message / 10);
+                let weight = parseFloat((r.message / 10).toFixed(3));
+                frm.set_value('custom_weight', weight);
             }
         }
     });
@@ -186,5 +242,44 @@ function calculate_total_mold_weight(frm) {
     let mold = (bush_qty * weight).toFixed(3);
     
     frm.set_value('custom_total_mold_weight', mold);
-    frm.set_value('qty', mold);
+    frm.set_value('qty', weight);
 }
+
+
+
+
+// Sync Bush Quantity to PO Work Order
+frappe.ui.form.on('Work Order', {
+    custom_bush_quantity: function(frm) {
+        if (!frm.doc.production_plan_sub_assembly_item || !frm.doc.custom_bush_quantity) return;
+        
+        frappe.call({
+            method: 'frappe.client.get_list',
+            args: {
+                doctype: 'Work Order',
+                filters: {
+                    production_plan: frm.doc.production_plan,
+                    production_plan_item: ['!=', '']
+                },
+                fields: ['name']
+            },
+            callback: function(r) {
+                if (!r.message || !r.message.length) return;
+                
+                r.message.forEach(wo => {
+                    frappe.db.get_doc('Work Order', wo.name).then(doc => {
+                        if (doc.required_items.find(i => i.item_code === frm.doc.production_item)) {
+                            frappe.call({
+                                method: 'fluorotech_custom.config.py.work_order.update_work_order_qty',
+                                args: {
+                                    work_order_name: wo.name,
+                                    qty_value: flt(frm.doc.custom_bush_quantity)
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        });
+    }
+});
