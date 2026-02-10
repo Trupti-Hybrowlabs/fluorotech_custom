@@ -51,6 +51,8 @@ app_license = "mit"
 
 doctype_js = {
     "Work Order": "public/js/work_order.js",
+    "BOM": "public/js/bom.js",
+    "Item": "public/js/item.js"
 }
 
 # Svg Icons

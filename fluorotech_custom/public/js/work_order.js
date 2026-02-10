@@ -6,6 +6,9 @@ frappe.ui.form.on("Work Order", {
         if (!frm.is_new() && !frm.doc.custom_density) {
             update_item_values(frm, true);
         }
+        setTimeout(() => {
+            fetch_fifo_batches_for_all_items(frm);
+        }, 300);
     },
     
     custom_range_of_size(frm) {
@@ -51,7 +54,37 @@ frappe.ui.form.on("Work Order", {
     },
     
     custom_bush_quantity(frm) { 
-        calculate_total_mold_weight(frm); 
+        calculate_total_mold_weight(frm);
+        if (!frm.doc.production_plan_sub_assembly_item || !frm.doc.custom_bush_quantity) return;
+        
+        frappe.call({
+            method: 'frappe.client.get_list',
+            args: {
+                doctype: 'Work Order',
+                filters: {
+                    production_plan: frm.doc.production_plan,
+                    production_plan_item: ['!=', '']
+                },
+                fields: ['name']
+            },
+            callback: function(r) {
+                if (!r.message || !r.message.length) return;
+                
+                r.message.forEach(wo => {
+                    frappe.db.get_doc('Work Order', wo.name).then(doc => {
+                        if (doc.required_items.find(i => i.item_code === frm.doc.production_item)) {
+                            frappe.call({
+                                method: 'fluorotech_custom.config.py.work_order.update_work_order_qty',
+                                args: {
+                                    work_order_name: wo.name,
+                                    qty_value: flt(frm.doc.custom_bush_quantity)
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        });
     },
     
     custom_weight(frm) { 
@@ -99,12 +132,29 @@ frappe.ui.form.on("Work Order", {
         } else {
             frm.set_value('custom_return_to_moulding_stage_date', '');
         }
+    },
+    
+    before_save: function(frm) {
+        fetch_fifo_batches_for_all_items(frm);
     }
 });
 
 frappe.ui.form.on('Work Order Item', {
     item_code(frm) {
         update_item_values(frm, false);
+        let row = locals[cdt][cdn];
+        if (row.item_code && row.required_qty) {
+            setTimeout(() => {
+                fetch_fifo_batches_for_single_row(frm, row, cdt, cdn);
+            }, 200);
+        }
+    },
+    
+    required_qty: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (row.item_code && row.required_qty) {
+            fetch_fifo_batches_for_single_row(frm, row, cdt, cdn);
+        }
     }
 });
 
@@ -245,41 +295,76 @@ function calculate_total_mold_weight(frm) {
     frm.set_value('qty', weight);
 }
 
-
-
-
-// Sync Bush Quantity to PO Work Order
-frappe.ui.form.on('Work Order', {
-    custom_bush_quantity: function(frm) {
-        if (!frm.doc.production_plan_sub_assembly_item || !frm.doc.custom_bush_quantity) return;
-        
-        frappe.call({
-            method: 'frappe.client.get_list',
-            args: {
-                doctype: 'Work Order',
-                filters: {
-                    production_plan: frm.doc.production_plan,
-                    production_plan_item: ['!=', '']
-                },
-                fields: ['name']
-            },
-            callback: function(r) {
-                if (!r.message || !r.message.length) return;
-                
-                r.message.forEach(wo => {
-                    frappe.db.get_doc('Work Order', wo.name).then(doc => {
-                        if (doc.required_items.find(i => i.item_code === frm.doc.production_item)) {
-                            frappe.call({
-                                method: 'fluorotech_custom.config.py.work_order.update_work_order_qty',
-                                args: {
-                                    work_order_name: wo.name,
-                                    qty_value: flt(frm.doc.custom_bush_quantity)
-                                }
-                            });
-                        }
-                    });
-                });
-            }
-        });
+function fetch_fifo_batches_for_all_items(frm) {
+    if (!frm.doc.required_items || frm.doc.required_items.length === 0) {
+        return;
     }
-});
+    
+    frm.doc.required_items.forEach((row, idx) => {
+        if (row.item_code && row.required_qty && !row.custom_batch_no) {
+            fetch_fifo_batches_for_single_row(frm, row, row.doctype, row.name);
+        }
+    });
+}
+
+function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
+    let required_qty = row.required_qty || 0;
+    
+    if (required_qty <= 0) {
+        return;
+    }
+    
+    frappe.call({
+        method: "frappe.client.get_list",
+        args: {
+            doctype: "Batch",
+            filters: {
+                item: row.item_code,
+                disabled: 0
+            },
+            fields: ["name", "batch_qty"],
+            order_by: "creation asc",
+            limit_page_length: 0
+        },
+        callback: function(r) {
+            if (!r.message || r.message.length === 0) {
+                return;
+            }
+
+            let batches = r.message;
+            let remaining_qty = required_qty;
+            let batch_data = [];
+
+            for (let batch of batches) {
+                if (remaining_qty <= 0) break;
+
+                let available_qty = batch.batch_qty || 0;
+
+                if (available_qty > 0) {
+                    let qty_to_take = Math.min(available_qty, remaining_qty);
+                    
+                    batch_data.push({
+                        batch: batch.name,
+                        qty: qty_to_take
+                    });
+
+                    remaining_qty -= qty_to_take;
+                }
+            }
+
+            if (batch_data.length === 0) {
+                return;
+            }
+
+            let batch_string = batch_data.map(b => `${b.batch}:${b.qty}`).join(',');
+
+            if (cdt && cdn) {
+                frappe.model.set_value(cdt, cdn, "custom_batch_no", batch_string);
+            } else {
+                row.custom_batch_no = batch_string;
+            }
+            
+            frm.refresh_field("required_items");
+        }
+    });
+}
