@@ -133,6 +133,41 @@ frappe.ui.form.on("Work Order", {
             frm.set_value('custom_return_to_moulding_stage_date', '');
         }
     },
+    custom_lathe(frm) {
+        if (frm.doc.custom_lathe) {
+            frm.set_value('custom_lathe_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_lathe_date', '');
+        }
+    },
+    custom_cnc(frm) {
+        if (frm.doc.custom_cnc) {
+            frm.set_value('custom_cnc_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_cnc_date', '');
+        }
+    },
+    custom_vmc(frm) {
+        if (frm.doc.custom_vmc) {
+            frm.set_value('custom_vmc_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_vmc_date', '');
+        }
+    },
+    custom_deburing(frm) {
+        if (frm.doc.custom_deburing) {
+            frm.set_value('custom_deburing_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_deburing_date', '');
+        }
+    },
+    custom_machining_completed(frm) {
+        if (frm.doc.custom_machining_completed) {
+            frm.set_value('custom_machining_completed_date', frappe.datetime.now_date());
+        } else {
+            frm.set_value('custom_machining_completed_date', '');
+        }
+    },
     
     before_save: function(frm) {
         fetch_fifo_batches_for_all_items(frm);
