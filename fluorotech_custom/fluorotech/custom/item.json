@@ -973,7 +973,7 @@
    "columns": 0,
    "creation": "2026-02-04 12:41:52.136117",
    "default": null,
-   "depends_on": "eval:!doc.is_fixed_asset && (doc.naming_series == \"CIC.####\" || doc.naming_series == \"SF.####\")",
+   "depends_on": "eval:!doc.is_fixed_asset && doc.naming_series != \"CIC.####\" && doc.naming_series != \"SF.####\"\n",
    "description": null,
    "docstatus": 0,
    "dt": "Item",
