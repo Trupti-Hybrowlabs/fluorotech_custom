@@ -41,12 +41,22 @@ def weight(od, id, length, density):
     
     return round(calculated_weight, 3)
 
-
 @frappe.whitelist()
 def update_work_order_qty(work_order_name, qty_value):
-    """Update Work Order qty field"""
-    work_order = frappe.get_doc("Work Order", work_order_name)
-    work_order.qty = float(qty_value)
-    work_order.flags.ignore_validate_update_after_submit = True
-    work_order.save(ignore_permissions=True)
+    """Update Work Order qty and recalculate required_items"""
+    wo = frappe.get_doc("Work Order", work_order_name)
+    new_qty = float(qty_value)
+    
+    wo.qty = new_qty
+    
+    # Recalculate required_items from BOM
+    if wo.bom_no and wo.required_items:
+        bom_items = {i.item_code: i.qty for i in frappe.get_doc("BOM", wo.bom_no).items}
+        for item in wo.required_items:
+            if item.item_code in bom_items:
+                item.required_qty = bom_items[item.item_code] * new_qty
+                item.amount = item.required_qty * (item.rate or 0)
+    
+    wo.flags.ignore_validate_update_after_submit = True
+    wo.save(ignore_permissions=True)
     frappe.db.commit()
