@@ -327,7 +327,7 @@ function calculate_total_mold_weight(frm) {
     let mold = (bush_qty * weight).toFixed(3);
     
     frm.set_value('custom_total_mold_weight', mold);
-    frm.set_value('qty', weight);
+    frm.set_value('qty', mold);
 }
 
 function fetch_fifo_batches_for_all_items(frm) {
