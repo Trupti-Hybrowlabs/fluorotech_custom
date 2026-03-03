@@ -6,9 +6,11 @@ frappe.ui.form.on("Work Order", {
         if (!frm.is_new() && !frm.doc.custom_density) {
             update_item_values(frm, true);
         }
-        setTimeout(() => {
-            fetch_fifo_batches_for_all_items(frm);
-        }, 300);
+        if (frm.doc.docstatus === 0 && (frm.is_new() || frm.doc.__unsaved)) {
+            setTimeout(() => {
+                fetch_fifo_batches_for_all_items(frm);
+            }, 300);
+        }
     },
     
     custom_range_of_size(frm) {
@@ -55,36 +57,36 @@ frappe.ui.form.on("Work Order", {
     
     custom_bush_quantity(frm) { 
         calculate_total_mold_weight(frm);
-        if (!frm.doc.production_plan_sub_assembly_item || !frm.doc.custom_bush_quantity) return;
+        // if (!frm.doc.production_plan_sub_assembly_item || !frm.doc.custom_bush_quantity) return;
         
-        frappe.call({
-            method: 'frappe.client.get_list',
-            args: {
-                doctype: 'Work Order',
-                filters: {
-                    production_plan: frm.doc.production_plan,
-                    production_plan_item: ['!=', '']
-                },
-                fields: ['name']
-            },
-            callback: function(r) {
-                if (!r.message || !r.message.length) return;
+        // frappe.call({
+        //     method: 'frappe.client.get_list',
+        //     args: {
+        //         doctype: 'Work Order',
+        //         filters: {
+        //             production_plan: frm.doc.production_plan,
+        //             production_plan_item: ['!=', '']
+        //         },
+        //         fields: ['name']
+        //     },
+        //     callback: function(r) {
+        //         if (!r.message || !r.message.length) return;
                 
-                r.message.forEach(wo => {
-                    frappe.db.get_doc('Work Order', wo.name).then(doc => {
-                        if (doc.required_items.find(i => i.item_code === frm.doc.production_item)) {
-                            frappe.call({
-                                method: 'fluorotech_custom.config.py.work_order.update_work_order_qty',
-                                args: {
-                                    work_order_name: wo.name,
-                                    qty_value: flt(frm.doc.custom_bush_quantity)
-                                }
-                            });
-                        }
-                    });
-                });
-            }
-        });
+        //         r.message.forEach(wo => {
+        //             frappe.db.get_doc('Work Order', wo.name).then(doc => {
+        //                 if (doc.required_items.find(i => i.item_code === frm.doc.production_item)) {
+        //                     frappe.call({
+        //                         method: 'fluorotech_custom.config.py.work_order.update_work_order_qty',
+        //                         args: {
+        //                             work_order_name: wo.name,
+        //                             qty_value: flt(frm.doc.custom_bush_quantity)
+        //                         }
+        //                     });
+        //                 }
+        //             });
+        //         });
+        //     }
+        // });
     },
     
     custom_weight(frm) { 
@@ -169,30 +171,28 @@ frappe.ui.form.on("Work Order", {
         }
     },
     
-    before_save: function(frm) {
-        fetch_fifo_batches_for_all_items(frm);
-    }
+    // before_save: function(frm) {
+    //     fetch_fifo_batches_for_all_items(frm);
+    // }
 });
+
 
 frappe.ui.form.on('Work Order Item', {
-    item_code(frm) {
+    item_code(frm, cdt, cdn) {
         update_item_values(frm, false);
-        let row = locals[cdt][cdn];
-        if (row.item_code && row.required_qty) {
-            setTimeout(() => {
-                fetch_fifo_batches_for_single_row(frm, row, cdt, cdn);
-            }, 200);
-        }
     },
-    
-    required_qty: function(frm, cdt, cdn) {
+
+    source_warehouse(frm, cdt, cdn) {
         let row = locals[cdt][cdn];
-        if (row.item_code && row.required_qty) {
+        if (!row.item_code || !row.source_warehouse) return;
+
+        frappe.model.set_value(cdt, cdn, 'custom_batch_no', '');
+
+        setTimeout(() => {
             fetch_fifo_batches_for_single_row(frm, row, cdt, cdn);
-        }
+        }, 300);
     }
 });
-
 function set_range_options(frm) {
     let range = frm.doc.custom_range_of_size;
     
@@ -327,7 +327,14 @@ function calculate_total_mold_weight(frm) {
     let mold = (bush_qty * weight).toFixed(3);
     
     frm.set_value('custom_total_mold_weight', mold);
-    frm.set_value('qty', mold);
+    // frm.set_value('qty', mold);
+    frm.doc.required_items.forEach(row => {
+        frappe.model.set_value(row.doctype, row.name, 'custom_batch_no', '');
+    });
+    
+    setTimeout(() => {
+        fetch_fifo_batches_for_all_items(frm);
+    }, 300);
 }
 
 function fetch_fifo_batches_for_all_items(frm) {
@@ -336,60 +343,49 @@ function fetch_fifo_batches_for_all_items(frm) {
     }
     
     frm.doc.required_items.forEach((row, idx) => {
-        if (row.item_code && row.required_qty && !row.custom_batch_no) {
+        if (row.item_code && (frm.doc.custom_total_mold_weight || row.required_qty)) {
             fetch_fifo_batches_for_single_row(frm, row, row.doctype, row.name);
         }
     });
 }
-
 function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
-    let required_qty = row.required_qty || 0;
-    
-    if (required_qty <= 0) {
+    let required_qty = frm.doc.custom_total_mold_weight || row.required_qty || 0;
+    if (required_qty <= 0) return;
+
+    if (!row.source_warehouse) {
+        frappe.show_alert({ message: `Source warehouse missing for ${row.item_code}`, indicator: 'orange' });
         return;
     }
-    
+
     frappe.call({
-        method: "frappe.client.get_list",
+        method: 'erpnext.stock.doctype.batch.batch.get_batch_qty',
         args: {
-            doctype: "Batch",
-            filters: {
-                item: row.item_code,
-                disabled: 0
-            },
-            fields: ["name", "batch_qty"],
-            order_by: "creation asc",
-            limit_page_length: 0
+            item_code: row.item_code,
+            warehouse: row.source_warehouse,
+            posting_date: frappe.datetime.get_today()
         },
         callback: function(r) {
-            if (!r.message || r.message.length === 0) {
-                return;
-            }
+            if (!r.message || r.message.length === 0) return;
 
-            let batches = r.message;
+            let batches = r.message
+                .filter(b => b.qty > 0)
+                .sort((a, b) => a.batch_no > b.batch_no ? 1 : -1);
+
             let remaining_qty = required_qty;
             let batch_data = [];
 
             for (let batch of batches) {
                 if (remaining_qty <= 0) break;
 
-                let available_qty = batch.batch_qty || 0;
-
-                if (available_qty > 0) {
-                    let qty_to_take = Math.min(available_qty, remaining_qty);
-                    
-                    batch_data.push({
-                        batch: batch.name,
-                        qty: qty_to_take
-                    });
-
-                    remaining_qty -= qty_to_take;
-                }
+                let qty_to_take = Math.min(batch.qty, remaining_qty);
+                batch_data.push({
+                    batch: batch.batch_no,
+                    qty: parseFloat(qty_to_take.toFixed(3))
+                });
+                remaining_qty -= qty_to_take;
             }
 
-            if (batch_data.length === 0) {
-                return;
-            }
+            if (batch_data.length === 0) return;
 
             let batch_string = batch_data.map(b => `${b.batch}:${b.qty}`).join(',');
 
@@ -398,7 +394,7 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
             } else {
                 row.custom_batch_no = batch_string;
             }
-            
+
             frm.refresh_field("required_items");
         }
     });

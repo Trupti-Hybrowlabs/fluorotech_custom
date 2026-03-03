@@ -41,22 +41,44 @@ def weight(od, id, length, density):
     
     return round(calculated_weight, 3)
 
-@frappe.whitelist()
-def update_work_order_qty(work_order_name, qty_value):
-    """Update Work Order qty and recalculate required_items"""
-    wo = frappe.get_doc("Work Order", work_order_name)
-    new_qty = float(qty_value)
+# @frappe.whitelist()
+# def update_work_order_qty(work_order_name, qty_value):
+#     """Update Work Order qty and recalculate required_items"""
+#     wo = frappe.get_doc("Work Order", work_order_name)
+#     new_qty = float(qty_value)
     
-    wo.qty = new_qty
+#     wo.qty = new_qty
     
-    # Recalculate required_items from BOM
-    if wo.bom_no and wo.required_items:
-        bom_items = {i.item_code: i.qty for i in frappe.get_doc("BOM", wo.bom_no).items}
-        for item in wo.required_items:
-            if item.item_code in bom_items:
-                item.required_qty = bom_items[item.item_code] * new_qty
-                item.amount = item.required_qty * (item.rate or 0)
+#     # Recalculate required_items from BOM
+#     if wo.bom_no and wo.required_items:
+#         bom_items = {i.item_code: i.qty for i in frappe.get_doc("BOM", wo.bom_no).items}
+#         for item in wo.required_items:
+#             if item.item_code in bom_items:
+#                 item.required_qty = bom_items[item.item_code] * new_qty
+#                 item.amount = item.required_qty * (item.rate or 0)
     
-    wo.flags.ignore_validate_update_after_submit = True
-    wo.save(ignore_permissions=True)
-    frappe.db.commit()
+#     wo.flags.ignore_validate_update_after_submit = True
+#     wo.save(ignore_permissions=True)
+#     frappe.db.commit()
+
+
+def set_job_numbers(doc, method):
+    if not doc.production_plan:
+        return
+
+    if doc.get('custom_job_number'):
+        return
+
+    sales_orders = frappe.db.get_all(
+        'Production Plan Sales Order',
+        filters={'parent': doc.production_plan},
+        fields=['sales_order', 'custom_job_number'],
+        order_by='idx asc'
+    )
+
+    for row in sales_orders:
+        if row.get('sales_order') and row.get('custom_job_number'):
+            doc.append('custom_job_number', {
+                'sales_order': row['sales_order'],
+                'job_number': row['custom_job_number']
+            })

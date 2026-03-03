@@ -57,6 +57,13 @@ doctype_js = {
     "Production Plan": "public/js/production_plan.js"
 }
 
+
+doc_events = {
+    "Work Order": {
+        "before_insert": "fluorotech_custom.config.py.work_order.set_job_numbers"
+    }
+}
+
 # Svg Icons
 # ------------------
 # include app icons in desk
