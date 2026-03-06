@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "format:DIE-{###}",
  "creation": "2026-02-04 12:29:18.307251",
@@ -31,7 +32,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-05 11:05:28.982942",
+ "modified": "2026-03-05 19:06:54.423436",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Die Details",

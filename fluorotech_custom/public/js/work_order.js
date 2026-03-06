@@ -11,7 +11,12 @@ frappe.ui.form.on("Work Order", {
                 fetch_fifo_batches_for_all_items(frm);
             }, 300);
         }
+        frm.set_query('source_warehouse', () => ({ filters: { custom_batch_making: 1 } }));
+        frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_batch_making: 1 } }));
+        frm.set_query('fg_warehouse', () => ({ filters: { custom_molding: 1 } }));
+        frm.is_new() && set_processes(frm);
     },
+    onload: function(frm) { frm.is_new() && set_processes(frm); },
     
     custom_range_of_size(frm) {
         set_range_options(frm);
@@ -95,6 +100,7 @@ frappe.ui.form.on("Work Order", {
     
     custom_sub_work_order_type(frm) { 
         update_item_values(frm, false); 
+        set_processes(frm);
     },
     custom_moulding_completed(frm) {
         if (frm.doc.custom_moulding_completed) {
@@ -104,29 +110,29 @@ frappe.ui.form.on("Work Order", {
         }
     },
     
-    custom__sintering_completed(frm) {
-        if (frm.doc.custom__sintering_completed) {
-            frm.set_value('custom_sintering_completed_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_sintering_completed_date', '');
-        }
-    },
+    // custom__sintering_completed(frm) {
+    //     if (frm.doc.custom__sintering_completed) {
+    //         frm.set_value('custom_sintering_completed_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_sintering_completed_date', '');
+    //     }
+    // },
     
-    custom_post_cooling_completed(frm) {
-        if (frm.doc.custom_post_cooling_completed) {
-            frm.set_value('custom_post_cooling_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_post_cooling_date', '');
-        }
-    },
+    // custom_post_cooling_completed(frm) {
+    //     if (frm.doc.custom_post_cooling_completed) {
+    //         frm.set_value('custom_post_cooling_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_post_cooling_date', '');
+    //     }
+    // },
     
-    custom_straightening_completed(frm) {
-        if (frm.doc.custom_straightening_completed) {
-            frm.set_value('custom_straightening_completed_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_straightening_completed_date', '');
-        }
-    },
+    // custom_straightening_completed(frm) {
+    //     if (frm.doc.custom_straightening_completed) {
+    //         frm.set_value('custom_straightening_completed_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_straightening_completed_date', '');
+    //     }
+    // },
     
     custom_return_to_moulding_stage(frm) {
         if (frm.doc.custom_return_to_moulding_stage) {
@@ -174,6 +180,16 @@ frappe.ui.form.on("Work Order", {
     // before_save: function(frm) {
     //     fetch_fifo_batches_for_all_items(frm);
     // }
+    custom_series: function(frm) {
+        frm.clear_table('custom_process_tracking');
+        set_processes(frm);
+    },
+    custom_enable_process_tracking: function(frm) {
+        (frm.doc.custom_process_tracking || []).forEach(row =>
+            frappe.model.set_value(row.doctype, row.name, 'completed', frm.doc.custom_enable_process_tracking ? 1 : 0)
+        );
+        frm.refresh_field('custom_process_tracking');
+    },
 });
 
 
@@ -329,6 +345,7 @@ function calculate_total_mold_weight(frm) {
     frm.set_value('custom_total_mold_weight', mold);
     // frm.set_value('qty', mold);
     frm.doc.required_items.forEach(row => {
+        frappe.model.set_value(row.doctype, row.name, 'custom_required_qty_1', mold);
         frappe.model.set_value(row.doctype, row.name, 'custom_batch_no', '');
     });
     
@@ -398,4 +415,34 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
             frm.refresh_field("required_items");
         }
     });
+}
+
+function set_processes(frm) {
+    if (frm.doc.custom_series !== 'SF.####') return;
+
+    const is_strip = frm.doc.custom_sub_work_order_type === 'Strip Section Process';
+
+    if (!is_strip) {
+        (frm.doc.custom_process_tracking || [])
+            .filter(r => ['Skiving', 'Etching'].includes(r.process_ct))
+            .forEach(r => frm.get_field('custom_process_tracking').grid.grid_rows_by_docname[r.name]?.remove());
+    }
+
+    const processes = [
+        'Sintering',
+        'Post Cooling',
+        'Straightening',
+        ...(is_strip ? ['Skiving', 'Etching'] : [])
+    ];
+
+    const existing = (frm.doc.custom_process_tracking || []).map(r => r.process_ct);
+    processes
+        .filter(p => !existing.includes(p))
+        .forEach(p => {
+            let row = frm.add_child('custom_process_tracking');
+            row.process_ct = p;
+            row.completed = frm.doc.custom_enable_process_tracking ? 1 : 0;
+        });
+
+    frm.refresh_field('custom_process_tracking');
 }
