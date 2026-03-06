@@ -1,37 +1,25 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
- "autoname": "CYC.###",
+ "autoname": "CYC.####",
  "creation": "2026-02-06 11:15:51.667073",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "item_name",
-  "cycle_no",
-  "description"
+  "cycle_no"
  ],
  "fields": [
-  {
-   "fieldname": "item_name",
-   "fieldtype": "Link",
-   "label": "Item Name",
-   "options": "Item"
-  },
   {
    "fieldname": "cycle_no",
    "fieldtype": "Data",
    "label": "Cycle No"
-  },
-  {
-   "fieldname": "description",
-   "fieldtype": "Data",
-   "label": "Description"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-10 15:21:36.393534",
+ "modified": "2026-03-06 14:43:32.034728",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Cycle No",
