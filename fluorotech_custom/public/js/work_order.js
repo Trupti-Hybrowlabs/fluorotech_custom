@@ -404,7 +404,7 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
 
             if (batch_data.length === 0) return;
 
-            let batch_string = batch_data.map(b => `${b.batch}:${b.qty}`).join(',');
+            let batch_string = batch_data.map(b => b.batch).join(',');
 
             if (cdt && cdn) {
                 frappe.model.set_value(cdt, cdn, "custom_batch_no", batch_string);
