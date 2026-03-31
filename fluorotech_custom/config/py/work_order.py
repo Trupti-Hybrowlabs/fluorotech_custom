@@ -76,9 +76,19 @@ def set_job_numbers(doc, method):
         order_by='idx asc'
     )
 
-    for row in sales_orders:
-        if row.get('sales_order') and row.get('custom_job_number'):
-            doc.append('custom_job_number', {
-                'sales_order': row['sales_order'],
-                'job_number': row['custom_job_number']
-            })
+    valid_rows = [
+        row for row in sales_orders
+        if row.get('sales_order') and row.get('custom_job_number')
+    ]
+
+    if not valid_rows:
+        return
+
+    for row in valid_rows:
+        doc.append('custom_job_number', {
+            'sales_orders': row['sales_order'],
+            'job_number': row['custom_job_number']
+        })
+
+    if doc.get('production_plan_sub_assembly_item') and doc.get('sales_order'):
+        doc.sales_order = None

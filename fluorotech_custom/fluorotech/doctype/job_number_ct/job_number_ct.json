@@ -6,29 +6,29 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "sales_order",
+  "sales_orders",
   "job_number"
  ],
  "fields": [
-  {
-   "fieldname": "sales_order",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Sales Order",
-   "options": "Sales Order"
-  },
   {
    "fieldname": "job_number",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Job Number"
+  },
+  {
+   "fieldname": "sales_orders",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Orders",
+   "options": "Sales Order"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-03 11:16:59.998565",
+ "modified": "2026-03-31 09:00:16.992324",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Job Number CT",
