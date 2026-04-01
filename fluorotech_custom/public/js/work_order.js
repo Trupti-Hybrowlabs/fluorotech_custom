@@ -11,10 +11,11 @@ frappe.ui.form.on("Work Order", {
                 fetch_fifo_batches_for_all_items(frm);
             }, 300);
         }
-        frm.set_query('source_warehouse', () => ({ filters: { custom_batch_making: 1 } }));
-        frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_batch_making: 1 } }));
-        frm.set_query('fg_warehouse', () => ({ filters: { custom_molding: 1 } }));
+        // frm.set_query('source_warehouse', () => ({ filters: { custom_batch_making: 1 } }));
+        // frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_batch_making: 1 } }));
+        // frm.set_query('fg_warehouse', () => ({ filters: { custom_molding: 1 } }));
         frm.is_new() && set_processes(frm);
+        set_warehouse_filters(frm);
     },
     onload: function(frm) { frm.is_new() && set_processes(frm); },
     
@@ -183,6 +184,7 @@ frappe.ui.form.on("Work Order", {
     custom_series: function(frm) {
         frm.clear_table('custom_process_tracking');
         set_processes(frm);
+        set_warehouse_filters(frm);
     },
     custom_enable_process_tracking: function(frm) {
         (frm.doc.custom_process_tracking || []).forEach(row =>
@@ -404,10 +406,12 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
 
             if (batch_data.length === 0) return;
 
-            let batch_string = batch_data.map(b => b.batch).join(',');
+            let batch_string = batch_data.map(b => `${b.batch}:${b.qty}`).join(',');
+            let display_string = batch_data.map(b => b.batch).join(', ');
 
             if (cdt && cdn) {
                 frappe.model.set_value(cdt, cdn, "custom_batch_no", batch_string);
+                frappe.model.set_value(cdt, cdn, "custom_batch_display", display_string); 
             } else {
                 row.custom_batch_no = batch_string;
             }
@@ -445,4 +449,23 @@ function set_processes(frm) {
         });
 
     frm.refresh_field('custom_process_tracking');
+}
+
+
+function set_warehouse_filters(frm) {
+    let series = frm.doc.custom_series;
+    
+    if (series === 'SF.####') {
+        frm.set_query('source_warehouse', () => ({ filters: { custom_source_sf: 1 } }));
+        frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_source_sf: 1 } }));
+        frm.set_query('fg_warehouse', () => ({ filters: { custom_target_sf: 1 } }));
+    } else if (series === 'CIC.####') {
+        frm.set_query('source_warehouse', () => ({ filters: { custom_source_cic: 1 } }));
+        frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_source_cic: 1 } }));
+        frm.set_query('fg_warehouse', () => ({ filters: { custom_target_cic: 1 } }));
+    } else {
+        frm.set_query('source_warehouse', () => ({ filters: {} }));
+        frm.set_query('source_warehouse', 'required_items', () => ({ filters: {} }));
+        frm.set_query('fg_warehouse', () => ({ filters: {} }));
+    }
 }
