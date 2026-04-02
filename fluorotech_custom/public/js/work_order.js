@@ -102,7 +102,7 @@ frappe.ui.form.on("Work Order", {
     custom_sub_work_order_type(frm) { 
         update_item_values(frm, false); 
         set_processes(frm);
-        if (frm.doc.custom_sub_work_order_type === 'Foreign process') {
+        if (frm.doc.custom_sub_work_order_type === 'Forging process') {
             add_default_foreign_process_rows(frm);
         } else {
             frm.clear_table('custom_foreign_process');
