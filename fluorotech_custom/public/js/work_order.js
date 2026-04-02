@@ -102,6 +102,12 @@ frappe.ui.form.on("Work Order", {
     custom_sub_work_order_type(frm) { 
         update_item_values(frm, false); 
         set_processes(frm);
+        if (frm.doc.custom_sub_work_order_type === 'Foreign process') {
+            add_default_foreign_process_rows(frm);
+        } else {
+            frm.clear_table('custom_foreign_process');
+            frm.refresh_field('custom_foreign_process');
+        }
     },
     custom_moulding_completed(frm) {
         if (frm.doc.custom_moulding_completed) {
@@ -468,4 +474,37 @@ function set_warehouse_filters(frm) {
         frm.set_query('source_warehouse', 'required_items', () => ({ filters: {} }));
         frm.set_query('fg_warehouse', () => ({ filters: {} }));
     }
+}
+
+function add_default_foreign_process_rows(frm) {
+    if (frm.doc.custom_foreign_process && frm.doc.custom_foreign_process.length > 0) {
+        frm.clear_table('custom_foreign_process');
+    }
+
+    const default_operations = [
+        "Forging/RM Receipt",
+        "Semi finish machining 1st side",
+        "Semi finish machining 2nd side",
+        "CNC Machining 1st side",
+        "CNC Machining 2nd side",
+        "VMC Operation 1 - Sealent hole operation (Verticle Sealent hole) (If Applicable)",
+        "VMC Operation 2 - Sealent hole operation (Horizontal Sealent hole) (If Applicable)",
+        "CNC Machining 3rd side ID Finish",
+        "NDT Testing (If Applicable)",
+        "ENP Coating (OUTSOURCE) & Inward Insp at FTE (If Applicable)",
+        "Insert Pressing 1",
+        "Relaxation",
+        "Insert Pressing 2",
+        "Radius machining/Ball height",
+        "Final Inspection",
+        "Pre-Dispatch Inspection",
+        "Packing & Dispatch",
+    ];
+
+    default_operations.forEach(function(op) {
+        let row = frm.add_child('custom_foreign_process');
+        row.operation_sequence = op;
+    });
+
+    frm.refresh_field('custom_foreign_process');
 }
