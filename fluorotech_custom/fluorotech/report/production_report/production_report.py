@@ -14,11 +14,18 @@ def execute(filters=None):
 def get_columns():
     return [
         {
-            "fieldname": "stock_entry_id",
-            "label": _("Stock Entry ID"),
+            "fieldname": "production_plan",
+            "label": _("Production Plan"),
             "fieldtype": "Link",
-            "options": "Stock Entry",
-            "width": 160
+            "options": "Production Plan",
+            "width": 180
+        },
+         {
+            "fieldname": "sales_order",
+            "label": _("Sales Order"),
+            "fieldtype": "Link",
+            "options": "Sales Order",
+            "width": 180
         },
         {
             "fieldname": "work_order",
@@ -26,6 +33,14 @@ def get_columns():
             "fieldtype": "Link",
             "options": "Work Order",
             "width": 180
+        },
+
+        {
+            "fieldname": "stock_entry_id",
+            "label": _("Stock Entry ID"),
+            "fieldtype": "Link",
+            "options": "Stock Entry",
+            "width": 160
         },
         {
             "fieldname": "item_code",
@@ -41,8 +56,14 @@ def get_columns():
             "width": 200
         },
         {
+            "fieldname": "wo_qty",
+            "label": _("Qty To Manufacture"),
+            "fieldtype": "Float",
+            "width": 120
+        },
+        {
             "fieldname": "qty",
-            "label": _("Qty"),
+            "label": _("Manufactured Qty"),
             "fieldtype": "Float",
             "width": 100
         },
@@ -75,18 +96,34 @@ def get_data(filters):
         SELECT
             se.name                   AS stock_entry_id,
             se.work_order             AS work_order,
+            wo.production_plan        AS production_plan,
+            pp_so.sales_order         AS sales_order,
             sed.item_code             AS item_code,
             sed.item_name             AS item_name,
             sed.qty                   AS qty,
             sed.uom                   AS uom,
             se.stock_entry_type       AS stock_entry_type,
-            se.posting_date           AS posting_date
+            se.posting_date           AS posting_date,
+            wo.qty                    AS wo_qty
         FROM
             `tabStock Entry` se
         INNER JOIN
             `tabStock Entry Detail` sed ON sed.parent = se.name
+        LEFT JOIN
+            `tabWork Order` wo ON wo.name = se.work_order
+        LEFT JOIN (
+            SELECT
+                parent,
+                GROUP_CONCAT(DISTINCT sales_order ORDER BY sales_order SEPARATOR ', ') AS sales_order
+            FROM
+                `tabProduction Plan Sales Order`
+            WHERE
+                sales_order IS NOT NULL AND sales_order != ''
+            GROUP BY
+                parent
+        ) pp_so ON pp_so.parent = wo.production_plan
         WHERE
-            se.docstatus != 2
+            se.docstatus = 1
             {conditions}
         ORDER BY
             se.creation DESC
