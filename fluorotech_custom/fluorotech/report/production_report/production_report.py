@@ -68,6 +68,12 @@ def get_columns():
             "width": 100
         },
         {
+            "fieldname": "rejection_qty",
+            "label": _("Rejection Qty"),
+            "fieldtype": "Float",
+            "width": 120
+        },
+        {
             "fieldname": "uom",
             "label": _("UOM"),
             "fieldtype": "Data",
@@ -96,6 +102,7 @@ def get_data(filters):
         SELECT
             se.name                   AS stock_entry_id,
             se.work_order             AS work_order,
+            wo.qty                    AS wo_qty,
             wo.production_plan        AS production_plan,
             pp_so.sales_order         AS sales_order,
             sed.item_code             AS item_code,
@@ -104,7 +111,11 @@ def get_data(filters):
             sed.uom                   AS uom,
             se.stock_entry_type       AS stock_entry_type,
             se.posting_date           AS posting_date,
-            wo.qty                    AS wo_qty
+            CASE
+                WHEN sed.item_code = wo.production_item
+                THEN COALESCE(pt.total_rejection_qty, 0)
+                ELSE NULL
+            END                       AS rejection_qty
         FROM
             `tabStock Entry` se
         INNER JOIN
@@ -122,6 +133,17 @@ def get_data(filters):
             GROUP BY
                 parent
         ) pp_so ON pp_so.parent = wo.production_plan
+        LEFT JOIN (
+            SELECT
+                parent,
+                SUM(rejection_qty) AS total_rejection_qty
+            FROM
+                `tabProcess CT`
+            WHERE
+                rejection_qty > 0
+            GROUP BY
+                parent
+        ) pt ON pt.parent = se.work_order
         WHERE
             se.docstatus = 1
             {conditions}
