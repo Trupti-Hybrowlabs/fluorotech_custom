@@ -62,7 +62,7 @@ def get_columns():
             "width": 200
         },
          {
-            "fieldname": "planned_qty",
+            "fieldname": "wo_qty",
             "label": _("Planned Qty"),
             "fieldtype": "Float",
             "width": 120
