@@ -589,7 +589,73 @@ def get_columns():
             "fieldtype": "Data",
             "width": 120
         },
+        {
+            "label": _("Work Order"),
+            "fieldname": "work_order_id",
+            "fieldtype": "Link",
+            "options": "Work Order",
+            "width": 160
+        },
     ]
+
+
+def get_sintering_straightening_select():
+    """
+    Returns the SELECT expressions for Sintering and Straightening
+    from the custom_process_tracking child table (Process CT doctype).
+    
+    Process CT fields:
+        process_ct      -> process name (e.g. 'Sintering', 'Straightening')
+        date            -> date of process
+        qty_produced    -> qty produced
+        rejection_qty   -> qty rejected
+        qty_accepted    -> qty accepted
+        remark          -> rejection reason
+        completed       -> check (1/0)
+        rejected        -> check (1/0)
+    
+    parentfield = 'custom_process_tracking'  <-- THIS was the missing piece
+    parenttype  = 'Work Order'
+    """
+    sintering = """
+        wo_sint.date                                        AS sintering_plan_date,
+        DATE_ADD(wo_sint.date, INTERVAL 1 DAY)             AS sintering_done_date,
+        wo.custom_oven_no                                   AS sintering_oven_no,
+        wo_sint.qty_produced                               AS sintering_qty_produced,
+        wo_sint.rejection_qty                              AS sintering_qty_rejected,
+        wo_sint.qty_accepted                               AS sintering_qty_accepted,
+        wo_sint.remark                                     AS sintering_rejection_reason"""
+
+    straightening = """
+        wo_str.date                                        AS straightening_plan_date,
+        DATE_ADD(wo_str.date, INTERVAL 1 DAY)             AS straightening_done_date,
+        wo.custom_oven_no                                  AS straightening_oven_no,
+        wo_str.qty_produced                               AS straightening_qty_produced,
+        wo_str.rejection_qty                              AS straightening_qty_rejected,
+        wo_str.qty_accepted                               AS straightening_qty_accepted,
+        wo_str.remark                                     AS straightening_rejection_reason"""
+
+    return sintering, straightening
+
+
+def get_process_ct_joins():
+    """
+    Returns the LEFT JOIN clauses for Sintering and Straightening.
+
+    KEY FIX:  Add  AND wo_sint.parentfield = 'custom_process_tracking'
+              This ensures we only read from the correct child table field,
+              not from any other Process CT usage.
+    """
+    return """
+        LEFT JOIN `tabProcess CT` wo_sint
+            ON wo_sint.parent      = wo.name
+            AND wo_sint.parentfield = 'custom_process_tracking'
+            AND wo_sint.process_ct  = 'Sintering'
+        LEFT JOIN `tabProcess CT` wo_str
+            ON wo_str.parent       = wo.name
+            AND wo_str.parentfield  = 'custom_process_tracking'
+            AND wo_str.process_ct   = 'Straightening'
+    """
 
 
 def get_data(filters):
@@ -601,7 +667,7 @@ def get_data(filters):
         values["customer"] = filters["customer"]
 
     if filters.get("item_code"):
-        conditions += " AND soi.item_code = %(item_code)s"
+        conditions += " AND ppi.item_code = %(item_code)s"
         values["item_code"] = filters["item_code"]
 
     if filters.get("dev_or_production"):
@@ -628,62 +694,49 @@ def get_data(filters):
         conditions += " AND so.transaction_date <= %(to_date)s"
         values["to_date"] = filters["to_date"]
 
-    data = frappe.db.sql("""
+    sint_select, str_select = get_sintering_straightening_select()
+    process_joins = get_process_ct_joins()
+
+    query1 = """
         SELECT
-            soi.custom_job_number AS job_no,
-            so.transaction_date AS po_enter_date,
-            soi.custom_type AS dev_or_production,
-            so.customer AS customer,
-            soi.item_code AS item_code,
-            soi.qty AS order_qty,
-            so.po_no AS po_no,
-            so.po_date AS po_date,
-            soi.custom_od AS od,
-            soi.custom_id AS id,
-            soi.custom_length AS length,
-            soi.custom_width AS width,
-            soi.custom_drawing_no AS drawing_number,
-            so.delivery_date AS delivery_date,
-            soi.rate AS rate_per_piece,
-            soi.amount AS total_cost,
-            NULL AS rejection_part_qty,
-            NULL AS dwg_available,
-            NULL AS finish_stock_qty,
-            NULL AS quality_accepted_qty,
-            NULL AS finish_stock_rejected_qty,
-            NULL AS moulding_qty,
-            soi.custom_combine_material_name AS material,
-            NULL AS no_of_days_for_dispatch,
-            (
-                SELECT pp.name 
-                FROM `tabProduction Plan` pp
-                INNER JOIN `tabProduction Plan Sales Order` ppso ON ppso.parent = pp.name
-                WHERE ppso.sales_order = so.name
-                AND pp.docstatus != 2
-                LIMIT 1
-            ) AS production_plan_no,
-            NULL AS moulding_production_plan_date,
-            NULL AS moulding_date,
-            NULL AS press_no,
-            NULL AS moulding_job_card_no,
-            NULL AS batch_no,
-            NULL AS moulding_qty_produced,
-            NULL AS moulding_qty_rejected,
-            NULL AS moulding_qty_accepted,
-            NULL AS sintering_plan_date,
-            NULL AS sintering_done_date,
-            NULL AS sintering_oven_no,
-            NULL AS sintering_qty_produced,
-            NULL AS sintering_qty_rejected,
-            NULL AS sintering_qty_accepted,
-            NULL AS sintering_rejection_reason,
-            NULL AS straightening_plan_date,
-            NULL AS straightening_done_date,
-            NULL AS straightening_oven_no,
-            NULL AS straightening_qty_produced,
-            NULL AS straightening_qty_rejected,
-            NULL AS straightening_qty_accepted,
-            NULL AS straightening_rejection_reason,
+            soi.custom_job_number                               AS job_no,
+            so.transaction_date                                 AS po_enter_date,
+            soi.custom_type                                     AS dev_or_production,
+            so.customer                                         AS customer,
+            ppi.item_code                                       AS item_code,
+            soi.qty                                             AS order_qty,
+            so.po_no                                            AS po_no,
+            so.po_date                                          AS po_date,
+            soi.custom_od                                       AS od,
+            soi.custom_id                                       AS id,
+            soi.custom_length                                   AS length,
+            soi.custom_width                                    AS width,
+            soi.custom_drawing_no                               AS drawing_number,
+            so.delivery_date                                    AS delivery_date,
+            soi.rate                                            AS rate_per_piece,
+            soi.amount                                          AS total_cost,
+            NULL                                                AS rejection_part_qty,
+            NULL                                                AS dwg_available,
+            NULL                                                AS finish_stock_qty,
+            NULL                                                AS quality_accepted_qty,
+            NULL                                                AS finish_stock_rejected_qty,
+            NULL                                                AS moulding_qty,
+            soi.custom_combine_material_name                    AS material,
+            NULL                                                AS no_of_days_for_dispatch,
+            ppi.parent                                          AS production_plan_no,
+            wo.custom_moulding_completed_date                   AS moulding_production_plan_date,
+            DATE_ADD(wo.custom_moulding_completed_date, INTERVAL 1 DAY) AS moulding_date,
+            wo.custom_mounlding_press_mc                        AS press_no,
+            NULL                                                AS moulding_job_card_no,
+            (SELECT woi.custom_batch_display 
+             FROM `tabWork Order Item` woi 
+             WHERE woi.parent = wo.name 
+             LIMIT 1)                                           AS batch_no,
+            NULL                                                AS moulding_qty_produced,
+            NULL                                                AS moulding_qty_rejected,
+            NULL                                                AS moulding_qty_accepted,
+            {sint_select},
+            {str_select},
             NULL AS observed_od,
             NULL AS observed_id,
             NULL AS observed_length,
@@ -691,24 +744,24 @@ def get_data(filters):
             NULL AS stage_rejected_qty,
             NULL AS stage_rejection_reason,
             NULL AS challan_no,
-            NULL AS lathe_production_plan_date,
-            NULL AS lathe_production_date,
+            wo.custom_lathe_date                                AS lathe_production_plan_date,
+            DATE_ADD(wo.custom_lathe_date, INTERVAL 1 DAY)     AS lathe_production_date,
             NULL AS lathe_job_card_no,
             NULL AS lathe_machine_no,
             NULL AS lathe_qty_produced,
             NULL AS lathe_qty_rejected,
             NULL AS lathe_qty_accepted,
             NULL AS lathe_rejection_reason,
-            NULL AS cnc_production_plan_date,
-            NULL AS cnc_production_date,
+            wo.custom_cnc_date                                  AS cnc_production_plan_date,
+            DATE_ADD(wo.custom_cnc_date, INTERVAL 1 DAY)       AS cnc_production_date,
             NULL AS cnc_job_card_no,
             NULL AS cnc_machine_no,
             NULL AS cnc_qty_produced,
             NULL AS cnc_qty_rejected,
             NULL AS cnc_qty_accepted,
             NULL AS cnc_rejection_reason,
-            NULL AS vnc_production_plan_date,
-            NULL AS vnc_production_date,
+            wo.custom_vmc_date                                  AS vnc_production_plan_date,
+            DATE_ADD(wo.custom_vmc_date, INTERVAL 1 DAY)       AS vnc_production_date,
             NULL AS vnc_job_card_no,
             NULL AS vnc_machine_no,
             NULL AS vnc_qty_produced,
@@ -728,16 +781,140 @@ def get_data(filters):
             NULL AS invoice_date,
             NULL AS quantity_dispatched,
             NULL AS dn_number,
-            NULL AS delivery_rating
+            NULL AS delivery_rating,
+            wo.name                                             AS work_order_id
         FROM
-            `tabSales Order Item` soi
-        INNER JOIN
-            `tabSales Order` so ON so.name = soi.parent
+            `tabProduction Plan Item` ppi
+        INNER JOIN `tabSales Order`      so  ON so.name  = ppi.sales_order
+        INNER JOIN `tabSales Order Item` soi ON soi.name = ppi.sales_order_item
+        LEFT  JOIN `tabWork Order`       wo
+            ON  wo.production_plan      = ppi.parent
+            AND wo.production_plan_item = ppi.name
+        {process_joins}
         WHERE
             so.docstatus = 1
             {conditions}
-        ORDER BY
-            so.transaction_date DESC, so.name, soi.idx
-    """.format(conditions=conditions), values, as_dict=1)
+    """.format(
+        sint_select=sint_select,
+        str_select=str_select,
+        process_joins=process_joins,
+        conditions=conditions
+    )
 
+    query2 = """
+        SELECT
+            soi.custom_job_number                               AS job_no,
+            so.transaction_date                                 AS po_enter_date,
+            soi.custom_type                                     AS dev_or_production,
+            so.customer                                         AS customer,
+            ppsa.production_item                                AS item_code,
+            soi.qty                                             AS order_qty,
+            so.po_no                                            AS po_no,
+            so.po_date                                          AS po_date,
+            soi.custom_od                                       AS od,
+            soi.custom_id                                       AS id,
+            soi.custom_length                                   AS length,
+            soi.custom_width                                    AS width,
+            soi.custom_drawing_no                               AS drawing_number,
+            so.delivery_date                                    AS delivery_date,
+            soi.rate                                            AS rate_per_piece,
+            soi.amount                                          AS total_cost,
+            NULL                                                AS rejection_part_qty,
+            NULL                                                AS dwg_available,
+            NULL                                                AS finish_stock_qty,
+            NULL                                                AS quality_accepted_qty,
+            NULL                                                AS finish_stock_rejected_qty,
+            NULL                                                AS moulding_qty,
+            soi.custom_combine_material_name                    AS material,
+            NULL                                                AS no_of_days_for_dispatch,
+            ppi.parent                                          AS production_plan_no,
+            wo.custom_moulding_completed_date                   AS moulding_production_plan_date,
+            DATE_ADD(wo.custom_moulding_completed_date, INTERVAL 1 DAY) AS moulding_date,
+            wo.custom_mounlding_press_mc                        AS press_no,
+            NULL                                                AS moulding_job_card_no,
+            (SELECT woi.custom_batch_display 
+             FROM `tabWork Order Item` woi 
+             WHERE woi.parent = wo.name 
+             LIMIT 1)                                           AS batch_no,
+            NULL                                                AS moulding_qty_produced,
+            NULL                                                AS moulding_qty_rejected,
+            NULL                                                AS moulding_qty_accepted,
+            {sint_select},
+            {str_select},
+            NULL AS observed_od,
+            NULL AS observed_id,
+            NULL AS observed_length,
+            NULL AS stage_accepted_qty,
+            NULL AS stage_rejected_qty,
+            NULL AS stage_rejection_reason,
+            NULL AS challan_no,
+            wo.custom_lathe_date                                AS lathe_production_plan_date,
+            DATE_ADD(wo.custom_lathe_date, INTERVAL 1 DAY)     AS lathe_production_date,
+            NULL AS lathe_job_card_no,
+            NULL AS lathe_machine_no,
+            NULL AS lathe_qty_produced,
+            NULL AS lathe_qty_rejected,
+            NULL AS lathe_qty_accepted,
+            NULL AS lathe_rejection_reason,
+            wo.custom_cnc_date                                  AS cnc_production_plan_date,
+            DATE_ADD(wo.custom_cnc_date, INTERVAL 1 DAY)       AS cnc_production_date,
+            NULL AS cnc_job_card_no,
+            NULL AS cnc_machine_no,
+            NULL AS cnc_qty_produced,
+            NULL AS cnc_qty_rejected,
+            NULL AS cnc_qty_accepted,
+            NULL AS cnc_rejection_reason,
+            wo.custom_vmc_date                                  AS vnc_production_plan_date,
+            DATE_ADD(wo.custom_vmc_date, INTERVAL 1 DAY)       AS vnc_production_date,
+            NULL AS vnc_job_card_no,
+            NULL AS vnc_machine_no,
+            NULL AS vnc_qty_produced,
+            NULL AS vnc_qty_rejected,
+            NULL AS vnc_qty_accepted,
+            NULL AS vnc_rejection_reason,
+            NULL AS fg_material_received_date,
+            NULL AS material_inspection_date,
+            NULL AS quantity_inspected,
+            NULL AS final_qty_rejected,
+            NULL AS final_qty_accepted,
+            NULL AS percent_rejection,
+            NULL AS cost_of_rejection,
+            NULL AS inspected_by,
+            NULL AS pdi_no,
+            NULL AS invoice_no,
+            NULL AS invoice_date,
+            NULL AS quantity_dispatched,
+            NULL AS dn_number,
+            NULL AS delivery_rating,
+            wo.name                                             AS work_order_id
+        FROM
+            `tabProduction Plan Item` ppi
+        INNER JOIN `tabSales Order`      so   ON so.name   = ppi.sales_order
+        INNER JOIN `tabSales Order Item` soi  ON soi.name  = ppi.sales_order_item
+        INNER JOIN `tabProduction Plan Sub Assembly Item` ppsa
+            ON  ppsa.parent                = ppi.parent
+            AND ppsa.production_plan_item  = ppi.name
+        LEFT  JOIN `tabWork Order`       wo
+            ON  wo.production_plan                    = ppi.parent
+            AND wo.production_plan_sub_assembly_item  = ppsa.name
+        {process_joins}
+        WHERE
+            so.docstatus = 1
+            {conditions}
+    """.format(
+        sint_select=sint_select,
+        str_select=str_select,
+        process_joins=process_joins,
+        conditions=conditions
+    )
+
+    full_sql = """
+        {q1}
+        UNION ALL
+        {q2}
+        ORDER BY
+            po_enter_date DESC, production_plan_no, job_no
+    """.format(q1=query1, q2=query2)
+
+    data = frappe.db.sql(full_sql, values, as_dict=1)
     return data
