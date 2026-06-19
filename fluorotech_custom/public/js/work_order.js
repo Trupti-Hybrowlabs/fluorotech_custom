@@ -448,9 +448,10 @@ function set_processes(frm) {
     }
 
     const processes = [
+        'Molding',
         'Sintering',
-        'Post Curing',
         'Straightening',
+        'Post Curing',
         ...(is_strip ? ['Skiving', 'Etching'] : [])
     ];
 

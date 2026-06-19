@@ -635,7 +635,13 @@ def get_sintering_straightening_select():
         wo_str.qty_accepted                               AS straightening_qty_accepted,
         wo_str.remark                                     AS straightening_rejection_reason"""
 
-    return sintering, straightening
+    molding = """
+        wo_mold.date           AS moulding_date,
+        wo_mold.qty_produced   AS moulding_qty_produced,
+        wo_mold.rejection_qty  AS moulding_qty_rejected,
+        wo_mold.qty_accepted   AS moulding_qty_accepted"""
+
+    return sintering, straightening, molding
 
 
 def get_process_ct_joins():
@@ -655,6 +661,10 @@ def get_process_ct_joins():
             ON wo_str.parent       = wo.name
             AND wo_str.parentfield  = 'custom_process_tracking'
             AND wo_str.process_ct   = 'Straightening'
+        LEFT JOIN `tabProcess CT` wo_mold
+            ON wo_mold.parent      = wo.name
+            AND wo_mold.parentfield = 'custom_process_tracking'
+            AND wo_mold.process_ct  = 'Molding'
     """
 
 
@@ -694,7 +704,7 @@ def get_data(filters):
         conditions += " AND so.transaction_date <= %(to_date)s"
         values["to_date"] = filters["to_date"]
 
-    sint_select, str_select = get_sintering_straightening_select()
+    sint_select, str_select, mold_select = get_sintering_straightening_select()
     process_joins = get_process_ct_joins()
 
     query1 = """
@@ -724,17 +734,15 @@ def get_data(filters):
             soi.custom_combine_material_name                    AS material,
             NULL                                                AS no_of_days_for_dispatch,
             ppi.parent                                          AS production_plan_no,
-            wo.custom_moulding_completed_date                   AS moulding_production_plan_date,
-            DATE_ADD(wo.custom_moulding_completed_date, INTERVAL 1 DAY) AS moulding_date,
+            pp.posting_date                                     AS moulding_production_plan_date,
+            wo.custom_moulding_completed_date                   AS moulding_date,
             wo.custom_mounlding_press_mc                        AS press_no,
             NULL                                                AS moulding_job_card_no,
             (SELECT woi.custom_batch_display 
              FROM `tabWork Order Item` woi 
              WHERE woi.parent = wo.name 
              LIMIT 1)                                           AS batch_no,
-            NULL                                                AS moulding_qty_produced,
-            NULL                                                AS moulding_qty_rejected,
-            NULL                                                AS moulding_qty_accepted,
+            {mold_select},
             {sint_select},
             {str_select},
             NULL AS observed_od,
@@ -791,12 +799,15 @@ def get_data(filters):
             ON  wo.production_plan      = ppi.parent
             AND wo.production_plan_item = ppi.name
         {process_joins}
+        LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
+            AND (wo.docstatus != 2 OR wo.name IS NULL)
             {conditions}
     """.format(
         sint_select=sint_select,
         str_select=str_select,
+        mold_select=mold_select,
         process_joins=process_joins,
         conditions=conditions
     )
@@ -828,17 +839,15 @@ def get_data(filters):
             soi.custom_combine_material_name                    AS material,
             NULL                                                AS no_of_days_for_dispatch,
             ppi.parent                                          AS production_plan_no,
-            wo.custom_moulding_completed_date                   AS moulding_production_plan_date,
-            DATE_ADD(wo.custom_moulding_completed_date, INTERVAL 1 DAY) AS moulding_date,
+            pp.posting_date                                     AS moulding_production_plan_date,
+            wo.custom_moulding_completed_date                   AS moulding_date,
             wo.custom_mounlding_press_mc                        AS press_no,
             NULL                                                AS moulding_job_card_no,
             (SELECT woi.custom_batch_display 
              FROM `tabWork Order Item` woi 
              WHERE woi.parent = wo.name 
              LIMIT 1)                                           AS batch_no,
-            NULL                                                AS moulding_qty_produced,
-            NULL                                                AS moulding_qty_rejected,
-            NULL                                                AS moulding_qty_accepted,
+            {mold_select},
             {sint_select},
             {str_select},
             NULL AS observed_od,
@@ -898,12 +907,15 @@ def get_data(filters):
             ON  wo.production_plan                    = ppi.parent
             AND wo.production_plan_sub_assembly_item  = ppsa.name
         {process_joins}
+        LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
+            AND (wo.docstatus != 2 OR wo.name IS NULL)
             {conditions}
     """.format(
         sint_select=sint_select,
         str_select=str_select,
+        mold_select=mold_select,
         process_joins=process_joins,
         conditions=conditions
     )
