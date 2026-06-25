@@ -396,7 +396,8 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
         args: {
             item_code: row.item_code,
             warehouse: row.source_warehouse,
-            posting_date: frappe.datetime.get_today()
+            posting_date: frappe.datetime.get_today(),
+            posting_time: frappe.datetime.now_time()
         },
         callback: function(r) {
             if (!r.message || r.message.length === 0) return;
