@@ -15,9 +15,10 @@ frappe.ui.form.on("Work Order", {
         // frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_batch_making: 1 } }));
         // frm.set_query('fg_warehouse', () => ({ filters: { custom_molding: 1 } }));
         frm.is_new() && set_processes(frm);
+        frm.is_new() && set_cic_processes(frm);
         set_warehouse_filters(frm);
     },
-    onload: function(frm) { frm.is_new() && set_processes(frm); },
+    onload: function(frm) { frm.is_new() && set_processes(frm); frm.is_new() && set_cic_processes(frm); },
     
     custom_range_of_size(frm) {
         set_range_options(frm);
@@ -153,27 +154,27 @@ frappe.ui.form.on("Work Order", {
             frm.set_value('custom_return_to_moulding_stage_date', '');
         }
     },
-    custom_lathe(frm) {
-        if (frm.doc.custom_lathe) {
-            frm.set_value('custom_lathe_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_lathe_date', '');
-        }
-    },
-    custom_cnc(frm) {
-        if (frm.doc.custom_cnc) {
-            frm.set_value('custom_cnc_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_cnc_date', '');
-        }
-    },
-    custom_vmc(frm) {
-        if (frm.doc.custom_vmc) {
-            frm.set_value('custom_vmc_date', frappe.datetime.now_date());
-        } else {
-            frm.set_value('custom_vmc_date', '');
-        }
-    },
+    // custom_lathe(frm) {
+    //     if (frm.doc.custom_lathe) {
+    //         frm.set_value('custom_lathe_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_lathe_date', '');
+    //     }
+    // },
+    // custom_cnc(frm) {
+    //     if (frm.doc.custom_cnc) {
+    //         frm.set_value('custom_cnc_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_cnc_date', '');
+    //     }
+    // },
+    // custom_vmc(frm) {
+    //     if (frm.doc.custom_vmc) {
+    //         frm.set_value('custom_vmc_date', frappe.datetime.now_date());
+    //     } else {
+    //         frm.set_value('custom_vmc_date', '');
+    //     }
+    // },
     custom_deburing(frm) {
         if (frm.doc.custom_deburing) {
             frm.set_value('custom_deburing_date', frappe.datetime.now_date());
@@ -196,12 +197,22 @@ frappe.ui.form.on("Work Order", {
         frm.clear_table('custom_process_tracking');
         set_processes(frm);
         set_warehouse_filters(frm);
+        frm.clear_table('custom_process');
+        set_cic_processes(frm);   
     },
     custom_enable_process_tracking: function(frm) {
         (frm.doc.custom_process_tracking || []).forEach(row =>
             frappe.model.set_value(row.doctype, row.name, 'completed', frm.doc.custom_enable_process_tracking ? 1 : 0)
         );
         frm.refresh_field('custom_process_tracking');
+    },
+    custom_enable_process: function(frm) {
+        if (frm.doc.custom_enable_process) {
+            set_cic_processes(frm);
+        } else {
+            frm.clear_table('custom_process');
+            frm.refresh_field('custom_process');
+        }
     },
 });
 
@@ -518,4 +529,20 @@ function add_default_foreign_process_rows(frm) {
     });
 
     frm.refresh_field('custom_foreign_process');
+}
+function set_cic_processes(frm) {
+    if (frm.doc.custom_series !== 'CIC.####') return;
+    if (!frm.doc.custom_enable_process) return;  
+
+    const processes = ['Lathe', 'CNC', 'VNC'];
+
+    const existing = (frm.doc.custom_process || []).map(r => r.cic_process_ct);
+    processes
+        .filter(p => !existing.includes(p))
+        .forEach(p => {
+            let row = frm.add_child('custom_process');
+            row.cic_process_ct = p;
+        });
+
+    frm.refresh_field('custom_process');
 }

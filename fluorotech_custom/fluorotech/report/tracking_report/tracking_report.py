@@ -219,6 +219,12 @@ def get_columns():
             "fieldtype": "Float",
             "width": 160
         },
+        {
+            "label": _("Moulding Rejection Reason"),
+            "fieldname": "moulding_rejection_reason",
+            "fieldtype": "Data",
+            "width": 180
+        },
 
         # ── SINTERING ────────────────────────────────────────────────────
         {
@@ -505,7 +511,7 @@ def get_columns():
         # ── FINAL INSPECTION ─────────────────────────────────────────────
         {
             "label": _("FG Material Received Date"),
-            "fieldname": "fg_material_received_date",
+            "fieldname": "custom_fg_material_receipt_date",
             "fieldtype": "Date",
             "width": 175
         },
@@ -639,9 +645,37 @@ def get_sintering_straightening_select():
         wo_mold.date           AS moulding_date,
         wo_mold.qty_produced   AS moulding_qty_produced,
         wo_mold.rejection_qty  AS moulding_qty_rejected,
-        wo_mold.qty_accepted   AS moulding_qty_accepted"""
+        wo_mold.qty_accepted   AS moulding_qty_accepted,
+        wo_mold.remark         AS moulding_rejection_reason"""
 
-    return sintering, straightening, molding
+    lathe = """
+        NULL                        AS lathe_production_plan_date,
+        wo_lathe.production_date   AS lathe_production_date,
+        wo_lathe.machine_no        AS lathe_machine_no,
+        wo_lathe.qty_produced      AS lathe_qty_produced,
+        wo_lathe.qty_rejected      AS lathe_qty_rejected,
+        wo_lathe.qty_accepted      AS lathe_qty_accepted,
+        wo_lathe.rejection_reason  AS lathe_rejection_reason"""
+
+    cnc = """
+        NULL                        AS cnc_production_plan_date,
+        wo_cnc.production_date     AS cnc_production_date,
+        wo_cnc.machine_no          AS cnc_machine_no,
+        wo_cnc.qty_produced        AS cnc_qty_produced,
+        wo_cnc.qty_rejected        AS cnc_qty_rejected,
+        wo_cnc.qty_accepted        AS cnc_qty_accepted,
+        wo_cnc.rejection_reason    AS cnc_rejection_reason"""
+
+    vnc = """
+        NULL                        AS vnc_production_plan_date,
+        wo_vnc.production_date     AS vnc_production_date,
+        wo_vnc.machine_no          AS vnc_machine_no,
+        wo_vnc.qty_produced        AS vnc_qty_produced,
+        wo_vnc.qty_rejected        AS vnc_qty_rejected,
+        wo_vnc.qty_accepted        AS vnc_qty_accepted,
+        wo_vnc.rejection_reason    AS vnc_rejection_reason"""  
+
+    return sintering, straightening, molding, lathe, cnc, vnc
 
 
 def get_process_ct_joins():
@@ -665,8 +699,59 @@ def get_process_ct_joins():
             ON wo_mold.parent      = wo.name
             AND wo_mold.parentfield = 'custom_process_tracking'
             AND wo_mold.process_ct  = 'Molding'
+        LEFT JOIN `tabCIC Process CT` wo_lathe
+            ON wo_lathe.parent = wo.name
+            AND wo_lathe.parentfield = 'custom_process'
+            AND wo_lathe.cic_process_ct = 'Lathe'
+        LEFT JOIN `tabCIC Process CT` wo_cnc
+            ON wo_cnc.parent = wo.name
+            AND wo_cnc.parentfield = 'custom_process'
+            AND wo_cnc.cic_process_ct = 'CNC'
+        LEFT JOIN `tabCIC Process CT` wo_vnc
+            ON wo_vnc.parent = wo.name
+            AND wo_vnc.parentfield = 'custom_process'
+            AND wo_vnc.cic_process_ct = 'VNC'
+        LEFT JOIN `tabStock Entry` se
+            ON se.work_order = wo.name
+            AND se.docstatus = 1
     """
 
+def get_qi_pivot_join():
+    return """
+        LEFT JOIN (
+            SELECT
+                qi.reference_name AS se_name,
+                MAX(CASE WHEN qic.parameter = 'OD' THEN qic.value END) AS observed_od,
+                MAX(CASE WHEN qic.parameter = 'ID' THEN qic.value END) AS observed_id,
+                MAX(CASE WHEN qic.parameter = 'Length' THEN qic.value END) AS observed_length,
+                MAX(CASE WHEN qic.parameter = 'Accepted Quantity' THEN qic.value END) AS stage_accepted_qty,
+                MAX(CASE WHEN qic.parameter = 'Rejected Quantity' THEN qic.value END) AS stage_rejected_qty,
+                MAX(CASE WHEN qic.parameter = 'Quantity Inspected' THEN qic.value END) AS quantity_inspected,
+                MAX(CASE WHEN qic.parameter = 'Rejected Quantity' THEN qic.value END) AS final_qty_rejected,
+                MAX(CASE WHEN qic.parameter = 'Accepted Quantity' THEN qic.value END) AS final_qty_accepted,
+                MAX(CASE WHEN qic.parameter = '%% Rejection' THEN qic.value END) AS percent_rejection,
+                MAX(CASE WHEN qic.parameter = 'Cost of Rejection' THEN qic.value END) AS cost_of_rejection,
+                MAX(qi.inspected_by) AS inspected_by,
+                MAX(qi.custom_pdi_no) AS custom_pdi_no
+
+            FROM `tabQuality Inspection` qi
+            INNER JOIN `tabQuality Inspection CT` qic
+                ON qic.parent = qi.name
+            WHERE qi.reference_type = 'Stock Entry'
+            GROUP BY qi.reference_name
+        ) qi_pivot ON qi_pivot.se_name = se.name
+    """
+def get_delivery_note_join():
+    return """
+        LEFT JOIN `tabJob Number CT` jnc
+            ON jnc.parent = wo.name
+            AND jnc.parentfield = 'custom_job_number'
+        LEFT JOIN `tabDelivery Note Item` dni
+            ON dni.against_sales_order = jnc.sales_orders
+        LEFT JOIN `tabDelivery Note` dn
+            ON dn.name = dni.parent
+            AND dn.docstatus = 1
+    """
 
 def get_data(filters):
     conditions = ""
@@ -704,8 +789,8 @@ def get_data(filters):
         conditions += " AND so.transaction_date <= %(to_date)s"
         values["to_date"] = filters["to_date"]
 
-    sint_select, str_select, mold_select = get_sintering_straightening_select()
-    process_joins = get_process_ct_joins()
+    sint_select, str_select, mold_select, lathe_select, cnc_select, vnc_select = get_sintering_straightening_select()
+    process_joins = get_process_ct_joins() + get_qi_pivot_join() + get_delivery_note_join()
 
     query1 = """
         SELECT
@@ -745,50 +830,29 @@ def get_data(filters):
             {mold_select},
             {sint_select},
             {str_select},
-            NULL AS observed_od,
-            NULL AS observed_id,
-            NULL AS observed_length,
-            NULL AS stage_accepted_qty,
-            NULL AS stage_rejected_qty,
+            qi_pivot.observed_od,
+            qi_pivot.observed_id,
+            qi_pivot.observed_length,
+            qi_pivot.stage_accepted_qty,
+            qi_pivot.stage_rejected_qty,
             NULL AS stage_rejection_reason,
-            NULL AS challan_no,
-            wo.custom_lathe_date                                AS lathe_production_plan_date,
-            DATE_ADD(wo.custom_lathe_date, INTERVAL 1 DAY)     AS lathe_production_date,
-            NULL AS lathe_job_card_no,
-            NULL AS lathe_machine_no,
-            NULL AS lathe_qty_produced,
-            NULL AS lathe_qty_rejected,
-            NULL AS lathe_qty_accepted,
-            NULL AS lathe_rejection_reason,
-            wo.custom_cnc_date                                  AS cnc_production_plan_date,
-            DATE_ADD(wo.custom_cnc_date, INTERVAL 1 DAY)       AS cnc_production_date,
-            NULL AS cnc_job_card_no,
-            NULL AS cnc_machine_no,
-            NULL AS cnc_qty_produced,
-            NULL AS cnc_qty_rejected,
-            NULL AS cnc_qty_accepted,
-            NULL AS cnc_rejection_reason,
-            wo.custom_vmc_date                                  AS vnc_production_plan_date,
-            DATE_ADD(wo.custom_vmc_date, INTERVAL 1 DAY)       AS vnc_production_date,
-            NULL AS vnc_job_card_no,
-            NULL AS vnc_machine_no,
-            NULL AS vnc_qty_produced,
-            NULL AS vnc_qty_rejected,
-            NULL AS vnc_qty_accepted,
-            NULL AS vnc_rejection_reason,
-            NULL AS fg_material_received_date,
+            wo.custom_challan_no AS challan_no,
+            {lathe_select},
+            {cnc_select},
+            {vnc_select},
+            wo.custom_fg_material_receipt_date,
             NULL AS material_inspection_date,
-            NULL AS quantity_inspected,
-            NULL AS final_qty_rejected,
-            NULL AS final_qty_accepted,
-            NULL AS percent_rejection,
-            NULL AS cost_of_rejection,
-            NULL AS inspected_by,
-            NULL AS pdi_no,
-            NULL AS invoice_no,
-            NULL AS invoice_date,
-            NULL AS quantity_dispatched,
-            NULL AS dn_number,
+            qi_pivot.quantity_inspected,
+            qi_pivot.final_qty_rejected,
+            qi_pivot.final_qty_accepted,
+            qi_pivot.percent_rejection,
+            qi_pivot.cost_of_rejection,
+            qi_pivot.inspected_by,
+            qi_pivot.custom_pdi_no AS pdi_no,
+            dn.custom_invoice_no AS invoice_no,
+            dn.custom_invoice_date AS invoice_date,
+            dni.qty AS quantity_dispatched,
+            dn.name AS dn_number,
             NULL AS delivery_rating,
             wo.name                                             AS work_order_id
         FROM
@@ -808,6 +872,9 @@ def get_data(filters):
         sint_select=sint_select,
         str_select=str_select,
         mold_select=mold_select,
+        lathe_select=lathe_select,
+        cnc_select=cnc_select,
+        vnc_select=vnc_select,
         process_joins=process_joins,
         conditions=conditions
     )
@@ -850,50 +917,29 @@ def get_data(filters):
             {mold_select},
             {sint_select},
             {str_select},
-            NULL AS observed_od,
-            NULL AS observed_id,
-            NULL AS observed_length,
-            NULL AS stage_accepted_qty,
-            NULL AS stage_rejected_qty,
+            qi_pivot.observed_od,
+            qi_pivot.observed_id,
+            qi_pivot.observed_length,
+            qi_pivot.stage_accepted_qty,
+            qi_pivot.stage_rejected_qty,
             NULL AS stage_rejection_reason,
-            NULL AS challan_no,
-            wo.custom_lathe_date                                AS lathe_production_plan_date,
-            DATE_ADD(wo.custom_lathe_date, INTERVAL 1 DAY)     AS lathe_production_date,
-            NULL AS lathe_job_card_no,
-            NULL AS lathe_machine_no,
-            NULL AS lathe_qty_produced,
-            NULL AS lathe_qty_rejected,
-            NULL AS lathe_qty_accepted,
-            NULL AS lathe_rejection_reason,
-            wo.custom_cnc_date                                  AS cnc_production_plan_date,
-            DATE_ADD(wo.custom_cnc_date, INTERVAL 1 DAY)       AS cnc_production_date,
-            NULL AS cnc_job_card_no,
-            NULL AS cnc_machine_no,
-            NULL AS cnc_qty_produced,
-            NULL AS cnc_qty_rejected,
-            NULL AS cnc_qty_accepted,
-            NULL AS cnc_rejection_reason,
-            wo.custom_vmc_date                                  AS vnc_production_plan_date,
-            DATE_ADD(wo.custom_vmc_date, INTERVAL 1 DAY)       AS vnc_production_date,
-            NULL AS vnc_job_card_no,
-            NULL AS vnc_machine_no,
-            NULL AS vnc_qty_produced,
-            NULL AS vnc_qty_rejected,
-            NULL AS vnc_qty_accepted,
-            NULL AS vnc_rejection_reason,
-            NULL AS fg_material_received_date,
+            wo.custom_challan_no AS challan_no,
+            {lathe_select},
+            {cnc_select},
+            {vnc_select},
+            wo.custom_fg_material_receipt_date,
             NULL AS material_inspection_date,
-            NULL AS quantity_inspected,
-            NULL AS final_qty_rejected,
-            NULL AS final_qty_accepted,
-            NULL AS percent_rejection,
-            NULL AS cost_of_rejection,
-            NULL AS inspected_by,
-            NULL AS pdi_no,
-            NULL AS invoice_no,
-            NULL AS invoice_date,
-            NULL AS quantity_dispatched,
-            NULL AS dn_number,
+            qi_pivot.quantity_inspected,
+            qi_pivot.final_qty_rejected,
+            qi_pivot.final_qty_accepted,
+            qi_pivot.percent_rejection,
+            qi_pivot.cost_of_rejection,
+            qi_pivot.inspected_by,
+            qi_pivot.custom_pdi_no AS pdi_no,
+            dn.custom_invoice_no AS invoice_no,
+            dn.custom_invoice_date AS invoice_date,
+            dni.qty AS quantity_dispatched,
+            dn.name AS dn_number,
             NULL AS delivery_rating,
             wo.name                                             AS work_order_id
         FROM
@@ -916,6 +962,9 @@ def get_data(filters):
         sint_select=sint_select,
         str_select=str_select,
         mold_select=mold_select,
+        lathe_select=lathe_select,
+        cnc_select=cnc_select,
+        vnc_select=vnc_select,
         process_joins=process_joins,
         conditions=conditions
     )

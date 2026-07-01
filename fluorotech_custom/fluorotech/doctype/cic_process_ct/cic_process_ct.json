@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-29 17:51:10.007040",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "cic_process_ct",
+  "production_date",
+  "machine_no",
+  "qty_produced",
+  "qty_rejected",
+  "qty_accepted",
+  "rejection_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "cic_process_ct",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Process"
+  },
+  {
+   "fieldname": "production_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Production Date"
+  },
+  {
+   "fieldname": "machine_no",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Machine No"
+  },
+  {
+   "fieldname": "qty_produced",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty Produced"
+  },
+  {
+   "fieldname": "qty_rejected",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty Rejected"
+  },
+  {
+   "fieldname": "qty_accepted",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty Accepted"
+  },
+  {
+   "fieldname": "rejection_reason",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Rejection Reason"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-29 19:23:21.430330",
+ "modified_by": "Administrator",
+ "module": "Fluorotech",
+ "name": "CIC Process CT",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
