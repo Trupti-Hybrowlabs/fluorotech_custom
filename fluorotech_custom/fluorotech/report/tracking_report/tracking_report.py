@@ -711,9 +711,6 @@ def get_process_ct_joins():
             ON wo_vnc.parent = wo.name
             AND wo_vnc.parentfield = 'custom_process'
             AND wo_vnc.cic_process_ct = 'VNC'
-        LEFT JOIN `tabStock Entry` se
-            ON se.work_order = wo.name
-            AND se.docstatus = 1
     """
 
 def get_qi_pivot_join():
@@ -741,16 +738,37 @@ def get_qi_pivot_join():
             GROUP BY qi.reference_name
         ) qi_pivot ON qi_pivot.se_name = se.name
     """
+
+def get_stock_entry_join():
+    return """
+        LEFT JOIN (
+            SELECT
+                work_order,
+                MAX(name) AS name
+            FROM `tabStock Entry`
+            WHERE docstatus = 1
+            GROUP BY work_order
+        ) se ON se.work_order = wo.name
+    """
+
 def get_delivery_note_join():
     return """
-        LEFT JOIN `tabJob Number CT` jnc
-            ON jnc.parent = wo.name
-            AND jnc.parentfield = 'custom_job_number'
-        LEFT JOIN `tabDelivery Note Item` dni
-            ON dni.against_sales_order = jnc.sales_orders
-        LEFT JOIN `tabDelivery Note` dn
-            ON dn.name = dni.parent
-            AND dn.docstatus = 1
+        LEFT JOIN (
+            SELECT
+                jnc.parent AS wo_name,
+                MAX(dn.custom_invoice_no) AS custom_invoice_no,
+                MAX(dn.custom_invoice_date) AS custom_invoice_date,
+                SUM(dni.qty) AS quantity_dispatched,
+                MAX(dn.name) AS dn_name
+            FROM `tabJob Number CT` jnc
+            LEFT JOIN `tabDelivery Note Item` dni
+                ON dni.against_sales_order = jnc.sales_orders
+            LEFT JOIN `tabDelivery Note` dn
+                ON dn.name = dni.parent
+                AND dn.docstatus = 1
+            WHERE jnc.parentfield = 'custom_job_number'
+            GROUP BY jnc.parent
+        ) dn ON dn.wo_name = wo.name
     """
 
 def get_data(filters):
@@ -790,7 +808,7 @@ def get_data(filters):
         values["to_date"] = filters["to_date"]
 
     sint_select, str_select, mold_select, lathe_select, cnc_select, vnc_select = get_sintering_straightening_select()
-    process_joins = get_process_ct_joins() + get_qi_pivot_join() + get_delivery_note_join()
+    process_joins = get_process_ct_joins() + get_stock_entry_join() + get_qi_pivot_join() + get_delivery_note_join()
 
     query1 = """
         SELECT
@@ -851,8 +869,8 @@ def get_data(filters):
             qi_pivot.custom_pdi_no AS pdi_no,
             dn.custom_invoice_no AS invoice_no,
             dn.custom_invoice_date AS invoice_date,
-            dni.qty AS quantity_dispatched,
-            dn.name AS dn_number,
+            dn.quantity_dispatched AS quantity_dispatched,
+            dn.dn_name AS dn_number,
             NULL AS delivery_rating,
             wo.name                                             AS work_order_id
         FROM
@@ -866,7 +884,7 @@ def get_data(filters):
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
-            AND (wo.docstatus != 2 OR wo.name IS NULL)
+            AND wo.docstatus = 1
             {conditions}
     """.format(
         sint_select=sint_select,
@@ -938,8 +956,8 @@ def get_data(filters):
             qi_pivot.custom_pdi_no AS pdi_no,
             dn.custom_invoice_no AS invoice_no,
             dn.custom_invoice_date AS invoice_date,
-            dni.qty AS quantity_dispatched,
-            dn.name AS dn_number,
+            dn.quantity_dispatched AS quantity_dispatched,
+            dn.dn_name AS dn_number,
             NULL AS delivery_rating,
             wo.name                                             AS work_order_id
         FROM
@@ -956,7 +974,7 @@ def get_data(filters):
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
-            AND (wo.docstatus != 2 OR wo.name IS NULL)
+            AND wo.docstatus = 1
             {conditions}
     """.format(
         sint_select=sint_select,
