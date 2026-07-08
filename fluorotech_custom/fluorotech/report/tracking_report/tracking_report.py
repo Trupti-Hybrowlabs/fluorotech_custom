@@ -351,12 +351,6 @@ def get_columns():
             "fieldtype": "Data",
             "width": 170
         },
-        {
-            "label": _("Material Movement (Challan No.)"),
-            "fieldname": "challan_no",
-            "fieldtype": "Data",
-            "width": 200
-        },
 
         # ── LATHE ────────────────────────────────────────────────────────
         {
@@ -460,52 +454,58 @@ def get_columns():
 
         # ── VNC ──────────────────────────────────────────────────────────
         {
-            "label": _("VNC Production Plan Date"),
+            "label": _("VMC Production Plan Date"),
             "fieldname": "vnc_production_plan_date",
             "fieldtype": "Date",
             "width": 175
         },
         {
-            "label": _("VNC Production Date"),
+            "label": _("VMC Production Date"),
             "fieldname": "vnc_production_date",
             "fieldtype": "Date",
             "width": 150
         },
         {
-            "label": _("VNC Job Card No"),
+            "label": _("VMC Job Card No"),
             "fieldname": "vnc_job_card_no",
             "fieldtype": "Data",
             "width": 140
         },
         {
-            "label": _("VNC Machine No"),
+            "label": _("VMC Machine No"),
             "fieldname": "vnc_machine_no",
             "fieldtype": "Data",
             "width": 130
         },
         {
-            "label": _("VNC Qty Produced"),
+            "label": _("VMC Qty Produced"),
             "fieldname": "vnc_qty_produced",
             "fieldtype": "Float",
             "width": 130
         },
         {
-            "label": _("VNC Qty Rejected"),
+            "label": _("VMC Qty Rejected"),
             "fieldname": "vnc_qty_rejected",
             "fieldtype": "Float",
             "width": 130
         },
         {
-            "label": _("VNC Qty Accepted"),
+            "label": _("VMC Qty Accepted"),
             "fieldname": "vnc_qty_accepted",
             "fieldtype": "Float",
             "width": 130
         },
         {
-            "label": _("VNC Rejection Reason"),
+            "label": _("VMC Rejection Reason"),
             "fieldname": "vnc_rejection_reason",
             "fieldtype": "Data",
             "width": 160
+        },
+        {
+            "label": _("Material Movement (Challan No.)"),
+            "fieldname": "challan_no",
+            "fieldtype": "Data",
+            "width": 200
         },
 
         # ── FINAL INSPECTION ─────────────────────────────────────────────
@@ -710,7 +710,7 @@ def get_process_ct_joins():
         LEFT JOIN `tabCIC Process CT` wo_vnc
             ON wo_vnc.parent = wo.name
             AND wo_vnc.parentfield = 'custom_process'
-            AND wo_vnc.cic_process_ct = 'VNC'
+            AND wo_vnc.cic_process_ct = 'VMC'
     """
 
 def get_qi_pivot_join():

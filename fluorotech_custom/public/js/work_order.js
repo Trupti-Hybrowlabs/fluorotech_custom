@@ -534,7 +534,7 @@ function set_cic_processes(frm) {
     if (frm.doc.custom_series !== 'CIC.####') return;
     if (!frm.doc.custom_enable_process) return;  
 
-    const processes = ['Lathe', 'CNC', 'VNC'];
+    const processes = ['Lathe', 'CNC', 'VMC'];
 
     const existing = (frm.doc.custom_process || []).map(r => r.cic_process_ct);
     processes
@@ -544,5 +544,46 @@ function set_cic_processes(frm) {
             row.cic_process_ct = p;
         });
 
+    frm.refresh_field('custom_process');
+}
+
+frappe.ui.form.on('Process CT', {
+    qty_produced(frm, cdt, cdn) {
+        calculate_process_ct_qty_accepted(frm, cdt, cdn);
+    },
+    rejection_qty(frm, cdt, cdn) {
+        calculate_process_ct_qty_accepted(frm, cdt, cdn);
+    },
+    rejected(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (!row.rejected) {
+            frappe.model.set_value(cdt, cdn, 'rejection_qty', 0);
+        }
+        calculate_process_ct_qty_accepted(frm, cdt, cdn);
+    }
+});
+function calculate_process_ct_qty_accepted(frm, cdt, cdn) {
+    let row = locals[cdt][cdn];
+    let qty_produced = flt(row.qty_produced);
+    let rejection_qty = flt(row.rejection_qty);
+    let qty_accepted = qty_produced - rejection_qty;
+    frappe.model.set_value(cdt, cdn, 'qty_accepted', qty_accepted);
+    frm.refresh_field('custom_process_tracking');
+}
+
+frappe.ui.form.on('CIC Process CT', {
+    qty_produced(frm, cdt, cdn) {
+        calculate_qty_accepted(frm, cdt, cdn);
+    },
+    qty_rejected(frm, cdt, cdn) {
+        calculate_qty_accepted(frm, cdt, cdn);
+    }
+});
+function calculate_qty_accepted(frm, cdt, cdn) {
+    let row = locals[cdt][cdn];
+    let qty_produced = flt(row.qty_produced);
+    let qty_rejected = flt(row.qty_rejected);
+    let qty_accepted = qty_produced - qty_rejected;
+    frappe.model.set_value(cdt, cdn, 'qty_accepted', qty_accepted);
     frm.refresh_field('custom_process');
 }

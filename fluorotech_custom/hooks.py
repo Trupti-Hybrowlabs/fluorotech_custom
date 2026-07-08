@@ -54,7 +54,9 @@ doctype_js = {
     "BOM": "public/js/bom.js",
     "Item": "public/js/item.js",
     "Sales Order": "public/js/sales_order.js",
-    "Production Plan": "public/js/production_plan.js"
+    "Production Plan": "public/js/production_plan.js",
+    "Stock Entry": "public/js/stock_entry.js",
+    "Quality Inspection": "public/js/quality_inspection.js"
 }
 
 

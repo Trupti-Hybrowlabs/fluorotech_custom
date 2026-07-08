@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "parameter",
-  "value"
+  "value",
+  "reason"
  ],
  "fields": [
   {
@@ -21,13 +22,19 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Value"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Reason"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-07-01 09:08:53.941665",
+ "modified": "2026-07-08 13:03:20.192039",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Quality Inspection CT",
