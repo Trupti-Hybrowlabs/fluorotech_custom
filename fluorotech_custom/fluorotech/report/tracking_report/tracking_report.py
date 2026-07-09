@@ -61,8 +61,15 @@ def get_columns():
             "width": 100
         },
         {
-            "label": _("Item Code / Description"),
-            "fieldname": "item_code",
+            "label": _("CIC Item Code"),
+            "fieldname": "cic_item_code",
+            "fieldtype": "Link",
+            "options": "Item",
+            "width": 160
+        },
+        {
+            "label": _("SF Item Code"),
+            "fieldname": "sf_item_code",
             "fieldtype": "Link",
             "options": "Item",
             "width": 160
@@ -502,10 +509,16 @@ def get_columns():
             "width": 160
         },
         {
-            "label": _("Material Movement (Challan No.)"),
-            "fieldname": "challan_no",
+            "label": _("CIC Challan No"),
+            "fieldname": "cic_challan_no",
             "fieldtype": "Data",
-            "width": 200
+            "width": 160
+        },
+        {
+            "label": _("SF Challan No"),
+            "fieldname": "sf_challan_no",
+            "fieldtype": "Data",
+            "width": 160
         },
 
         # ── FINAL INSPECTION ─────────────────────────────────────────────
@@ -595,13 +608,13 @@ def get_columns():
             "fieldtype": "Data",
             "width": 120
         },
-        {
-            "label": _("Work Order"),
-            "fieldname": "work_order_id",
-            "fieldtype": "Link",
-            "options": "Work Order",
-            "width": 160
-        },
+        # {
+        #     "label": _("Work Order"),
+        #     "fieldname": "work_order_id",
+        #     "fieldtype": "Link",
+        #     "options": "Work Order",
+        #     "width": 160
+        # },
     ]
 
 
@@ -626,7 +639,7 @@ def get_sintering_straightening_select():
     sintering = """
         wo_sint.date                                        AS sintering_plan_date,
         DATE_ADD(wo_sint.date, INTERVAL 1 DAY)             AS sintering_done_date,
-        wo.custom_oven_no                                   AS sintering_oven_no,
+        wo2.custom_oven_no                                   AS sintering_oven_no,
         wo_sint.qty_produced                               AS sintering_qty_produced,
         wo_sint.rejection_qty                              AS sintering_qty_rejected,
         wo_sint.qty_accepted                               AS sintering_qty_accepted,
@@ -635,7 +648,7 @@ def get_sintering_straightening_select():
     straightening = """
         wo_str.date                                        AS straightening_plan_date,
         DATE_ADD(wo_str.date, INTERVAL 1 DAY)             AS straightening_done_date,
-        wo.custom_oven_no                                  AS straightening_oven_no,
+        wo2.custom_oven_no                                  AS straightening_oven_no,
         wo_str.qty_produced                               AS straightening_qty_produced,
         wo_str.rejection_qty                              AS straightening_qty_rejected,
         wo_str.qty_accepted                               AS straightening_qty_accepted,
@@ -688,15 +701,15 @@ def get_process_ct_joins():
     """
     return """
         LEFT JOIN `tabProcess CT` wo_sint
-            ON wo_sint.parent      = wo.name
+            ON wo_sint.parent      = wo2.name
             AND wo_sint.parentfield = 'custom_process_tracking'
             AND wo_sint.process_ct  = 'Sintering'
         LEFT JOIN `tabProcess CT` wo_str
-            ON wo_str.parent       = wo.name
+            ON wo_str.parent       = wo2.name
             AND wo_str.parentfield  = 'custom_process_tracking'
             AND wo_str.process_ct   = 'Straightening'
         LEFT JOIN `tabProcess CT` wo_mold
-            ON wo_mold.parent      = wo.name
+            ON wo_mold.parent      = wo2.name
             AND wo_mold.parentfield = 'custom_process_tracking'
             AND wo_mold.process_ct  = 'Molding'
         LEFT JOIN `tabCIC Process CT` wo_lathe
@@ -751,6 +764,37 @@ def get_stock_entry_join():
         ) se ON se.work_order = wo.name
     """
 
+def get_stock_entry_join_sf():
+    return """
+        LEFT JOIN (
+            SELECT
+                work_order,
+                MAX(name) AS name
+            FROM `tabStock Entry`
+            WHERE docstatus = 1
+            GROUP BY work_order
+        ) se2 ON se2.work_order = wo2.name
+    """
+
+def get_qi_pivot_join_sf():
+    return """
+        LEFT JOIN (
+            SELECT
+                qi.reference_name AS se_name,
+                MAX(CASE WHEN qic.parameter = 'OD' THEN qic.value END) AS observed_od,
+                MAX(CASE WHEN qic.parameter = 'ID' THEN qic.value END) AS observed_id,
+                MAX(CASE WHEN qic.parameter = 'Length' THEN qic.value END) AS observed_length,
+                MAX(CASE WHEN qic.parameter = 'Accepted Quantity' THEN qic.value END) AS stage_accepted_qty,
+                MAX(CASE WHEN qic.parameter = 'Rejected Quantity' THEN qic.value END) AS stage_rejected_qty
+
+            FROM `tabQuality Inspection` qi
+            INNER JOIN `tabQuality Inspection CT` qic
+                ON qic.parent = qi.name
+            WHERE qi.reference_type = 'Stock Entry'
+            GROUP BY qi.reference_name
+        ) qi_pivot_sf ON qi_pivot_sf.se_name = se2.name
+    """
+
 def get_delivery_note_join():
     return """
         LEFT JOIN (
@@ -780,7 +824,7 @@ def get_data(filters):
         values["customer"] = filters["customer"]
 
     if filters.get("item_code"):
-        conditions += " AND ppi.item_code = %(item_code)s"
+        conditions += " AND (ppi.item_code = %(item_code)s OR ppsa.production_item = %(item_code)s)"
         values["item_code"] = filters["item_code"]
 
     if filters.get("dev_or_production"):
@@ -808,7 +852,7 @@ def get_data(filters):
         values["to_date"] = filters["to_date"]
 
     sint_select, str_select, mold_select, lathe_select, cnc_select, vnc_select = get_sintering_straightening_select()
-    process_joins = get_process_ct_joins() + get_stock_entry_join() + get_qi_pivot_join() + get_delivery_note_join()
+    process_joins = get_process_ct_joins() + get_stock_entry_join() + get_qi_pivot_join() + get_stock_entry_join_sf() + get_qi_pivot_join_sf() + get_delivery_note_join()
 
     query1 = """
         SELECT
@@ -816,7 +860,8 @@ def get_data(filters):
             so.transaction_date                                 AS po_enter_date,
             soi.custom_type                                     AS dev_or_production,
             so.customer                                         AS customer,
-            ppi.item_code                                       AS item_code,
+            ppi.item_code                                       AS cic_item_code,
+            ppsa.production_item                                AS sf_item_code,
             soi.qty                                             AS order_qty,
             so.po_no                                            AS po_no,
             so.po_date                                          AS po_date,
@@ -838,23 +883,24 @@ def get_data(filters):
             NULL                                                AS no_of_days_for_dispatch,
             ppi.parent                                          AS production_plan_no,
             pp.posting_date                                     AS moulding_production_plan_date,
-            wo.custom_moulding_completed_date                   AS moulding_date,
-            wo.custom_mounlding_press_mc                        AS press_no,
+            wo2.custom_moulding_completed_date                  AS moulding_date,
+            wo2.custom_mounlding_press_mc                       AS press_no,
             NULL                                                AS moulding_job_card_no,
             (SELECT woi.custom_batch_display 
-             FROM `tabWork Order Item` woi 
-             WHERE woi.parent = wo.name 
-             LIMIT 1)                                           AS batch_no,
+            FROM `tabWork Order Item` woi 
+            WHERE woi.parent = wo2.name 
+            LIMIT 1)                                           AS batch_no,
             {mold_select},
             {sint_select},
             {str_select},
-            qi_pivot.observed_od,
-            qi_pivot.observed_id,
-            qi_pivot.observed_length,
-            qi_pivot.stage_accepted_qty,
-            qi_pivot.stage_rejected_qty,
+            qi_pivot_sf.observed_od,
+            qi_pivot_sf.observed_id,
+            qi_pivot_sf.observed_length,
+            qi_pivot_sf.stage_accepted_qty,
+            qi_pivot_sf.stage_rejected_qty,
             NULL AS stage_rejection_reason,
-            wo.custom_challan_no AS challan_no,
+            wo.custom_challan_no  AS cic_challan_no,
+            wo2.custom_challan_no AS sf_challan_no,
             {lathe_select},
             {cnc_select},
             {vnc_select},
@@ -880,96 +926,12 @@ def get_data(filters):
         LEFT  JOIN `tabWork Order`       wo
             ON  wo.production_plan      = ppi.parent
             AND wo.production_plan_item = ppi.name
-        {process_joins}
-        LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
-        WHERE
-            so.docstatus = 1
-            AND wo.docstatus = 1
-            {conditions}
-    """.format(
-        sint_select=sint_select,
-        str_select=str_select,
-        mold_select=mold_select,
-        lathe_select=lathe_select,
-        cnc_select=cnc_select,
-        vnc_select=vnc_select,
-        process_joins=process_joins,
-        conditions=conditions
-    )
-
-    query2 = """
-        SELECT
-            soi.custom_job_number                               AS job_no,
-            so.transaction_date                                 AS po_enter_date,
-            soi.custom_type                                     AS dev_or_production,
-            so.customer                                         AS customer,
-            ppsa.production_item                                AS item_code,
-            soi.qty                                             AS order_qty,
-            so.po_no                                            AS po_no,
-            so.po_date                                          AS po_date,
-            soi.custom_od                                       AS od,
-            soi.custom_id                                       AS id,
-            soi.custom_length                                   AS length,
-            soi.custom_width                                    AS width,
-            soi.custom_drawing_no                               AS drawing_number,
-            so.delivery_date                                    AS delivery_date,
-            soi.rate                                            AS rate_per_piece,
-            soi.amount                                          AS total_cost,
-            NULL                                                AS rejection_part_qty,
-            NULL                                                AS dwg_available,
-            NULL                                                AS finish_stock_qty,
-            NULL                                                AS quality_accepted_qty,
-            NULL                                                AS finish_stock_rejected_qty,
-            NULL                                                AS moulding_qty,
-            soi.custom_combine_material_name                    AS material,
-            NULL                                                AS no_of_days_for_dispatch,
-            ppi.parent                                          AS production_plan_no,
-            pp.posting_date                                     AS moulding_production_plan_date,
-            wo.custom_moulding_completed_date                   AS moulding_date,
-            wo.custom_mounlding_press_mc                        AS press_no,
-            NULL                                                AS moulding_job_card_no,
-            (SELECT woi.custom_batch_display 
-             FROM `tabWork Order Item` woi 
-             WHERE woi.parent = wo.name 
-             LIMIT 1)                                           AS batch_no,
-            {mold_select},
-            {sint_select},
-            {str_select},
-            qi_pivot.observed_od,
-            qi_pivot.observed_id,
-            qi_pivot.observed_length,
-            qi_pivot.stage_accepted_qty,
-            qi_pivot.stage_rejected_qty,
-            NULL AS stage_rejection_reason,
-            wo.custom_challan_no AS challan_no,
-            {lathe_select},
-            {cnc_select},
-            {vnc_select},
-            wo.custom_fg_material_receipt_date,
-            NULL AS material_inspection_date,
-            qi_pivot.quantity_inspected,
-            qi_pivot.final_qty_rejected,
-            qi_pivot.final_qty_accepted,
-            qi_pivot.percent_rejection,
-            qi_pivot.cost_of_rejection,
-            qi_pivot.inspected_by,
-            qi_pivot.custom_pdi_no AS pdi_no,
-            dn.custom_invoice_no AS invoice_no,
-            dn.custom_invoice_date AS invoice_date,
-            dn.quantity_dispatched AS quantity_dispatched,
-            dn.dn_name AS dn_number,
-            NULL AS delivery_rating,
-            wo.name                                             AS work_order_id
-        FROM
-            `tabProduction Plan Item` ppi
-        INNER JOIN `tabSales Order`      so   ON so.name   = ppi.sales_order
-        INNER JOIN `tabSales Order Item` soi  ON soi.name  = ppi.sales_order_item
-        INNER JOIN `tabProduction Plan Sub Assembly Item` ppsa
-            ON  ppsa.parent                = ppi.parent
-            AND ppsa.production_plan_item  = ppi.name
-        LEFT  JOIN `tabWork Order`       wo
-            ON  wo.production_plan                    = ppi.parent
-            AND wo.production_plan_sub_assembly_item  = ppsa.name
+        LEFT JOIN `tabProduction Plan Sub Assembly Item` ppsa
+            ON ppsa.production_plan_item = ppi.name
+        LEFT JOIN `tabWork Order` wo2
+            ON  wo2.production_plan                   = ppi.parent
+            AND wo2.production_plan_sub_assembly_item = ppsa.name
+            AND wo2.docstatus = 1
         {process_joins}
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
@@ -989,11 +951,9 @@ def get_data(filters):
 
     full_sql = """
         {q1}
-        UNION ALL
-        {q2}
         ORDER BY
             po_enter_date DESC, production_plan_no, job_no
-    """.format(q1=query1, q2=query2)
+    """.format(q1=query1)
 
     data = frappe.db.sql(full_sql, values, as_dict=1)
     return data
