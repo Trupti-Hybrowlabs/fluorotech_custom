@@ -49,6 +49,12 @@ def get_columns():
             "width": 160
         },
         {
+            "fieldname": "stock_entry_type",
+            "label": _("Stock Entry Type"),
+            "fieldtype": "Data",
+            "width": 200
+        },
+        {
             "fieldname": "item_code",
             "label": _("Item Code"),
             "fieldtype": "Link",
@@ -92,17 +98,18 @@ def get_columns():
             "fieldtype": "Data",
             "width": 80
         },
-        {
-            "fieldname": "stock_entry_type",
-            "label": _("Stock Entry Type"),
-            "fieldtype": "Data",
-            "width": 200
-        },
+        
         {
             "fieldname": "posting_date",
             "label": _("Date"),
             "fieldtype": "Date",
             "width": 150
+        },
+        {
+            "fieldname": "posting_time",
+            "label": _("Time"),
+            "fieldtype": "Time",
+            "width": 120
         },
         {
             "fieldname": "moulding_press_mc",
@@ -111,13 +118,13 @@ def get_columns():
             "options": "Asset",
             "width": 160
         },
-        {
-            "fieldname": "job_no",
-            "label": _("Job No"),
-            "fieldtype": "Link",
-            "options": "Job Card",
-            "width": 160
-        },
+        # {
+        #     "fieldname": "job_no",
+        #     "label": _("Job No"),
+        #     "fieldtype": "Link",
+        #     "options": "Job Card",
+        #     "width": 160
+        # },
         {
             "fieldname": "reason",
             "label": _("Reason"),
@@ -147,7 +154,7 @@ def get_data(filters):
             se.stock_entry_type           AS stock_entry_type,
             se.posting_date               AS posting_date,
             wo.custom_mounlding_press_mc  AS moulding_press_mc,
-            jc.job_card_no                AS job_no,
+            se.posting_time               AS posting_time,
             CASE
                 WHEN sed.item_code = wo.production_item
                 THEN COALESCE(pt.total_rejection_qty, 0)
@@ -199,17 +206,6 @@ def get_data(filters):
             GROUP BY
                 parent
         ) pt ON pt.parent = se.work_order
-        LEFT JOIN (
-            SELECT
-                work_order,
-                GROUP_CONCAT(DISTINCT name ORDER BY creation SEPARATOR ', ') AS job_card_no
-            FROM
-                `tabJob Card`
-            WHERE
-                docstatus != 2
-            GROUP BY
-                work_order
-        ) jc ON jc.work_order = se.work_order
         WHERE
             se.docstatus = 1
             {conditions}
