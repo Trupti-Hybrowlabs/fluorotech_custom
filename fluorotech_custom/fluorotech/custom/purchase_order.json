@@ -365,7 +365,7 @@
    "name": "Purchase Order-custom_order_type",
    "no_copy": 0,
    "non_negative": 0,
-   "options": "\nRaw Material\nProcessing Material\nMachining Material\nForging Material\nBoughtout Material\nSub Assemblies\nServices\nCapex",
+   "options": "\nRaw Material\nProcessing Material\nMachining Material\nForging Material\nBoughtout Material\nSub Assemblies\nChemicals\nConsumables\nServices\nCapex",
    "owner": "Administrator",
    "permlevel": 0,
    "placeholder": null,

@@ -358,6 +358,12 @@ def get_columns():
             "fieldtype": "Data",
             "width": 170
         },
+        {
+            "label": _("SF Challan No"),
+            "fieldname": "sf_challan_no",
+            "fieldtype": "Data",
+            "width": 160
+        },
 
         # ── LATHE ────────────────────────────────────────────────────────
         {
@@ -511,12 +517,6 @@ def get_columns():
         {
             "label": _("CIC Challan No"),
             "fieldname": "cic_challan_no",
-            "fieldtype": "Data",
-            "width": 160
-        },
-        {
-            "label": _("SF Challan No"),
-            "fieldname": "sf_challan_no",
             "fieldtype": "Data",
             "width": 160
         },
@@ -785,7 +785,8 @@ def get_qi_pivot_join_sf():
                 MAX(CASE WHEN qic.parameter = 'ID' THEN qic.value END) AS observed_id,
                 MAX(CASE WHEN qic.parameter = 'Length' THEN qic.value END) AS observed_length,
                 MAX(CASE WHEN qic.parameter = 'Accepted Quantity' THEN qic.value END) AS stage_accepted_qty,
-                MAX(CASE WHEN qic.parameter = 'Rejected Quantity' THEN qic.value END) AS stage_rejected_qty
+                MAX(CASE WHEN qic.parameter = 'Rejected Quantity' THEN qic.value END) AS stage_rejected_qty,
+                MAX(CASE WHEN qic.parameter = 'Reason' THEN qic.value END) AS stage_rejection_reason 
 
             FROM `tabQuality Inspection` qi
             INNER JOIN `tabQuality Inspection CT` qic
@@ -898,7 +899,7 @@ def get_data(filters):
             qi_pivot_sf.observed_length,
             qi_pivot_sf.stage_accepted_qty,
             qi_pivot_sf.stage_rejected_qty,
-            NULL AS stage_rejection_reason,
+            qi_pivot_sf.stage_rejection_reason AS stage_rejection_reason,
             wo.custom_challan_no  AS cic_challan_no,
             wo2.custom_challan_no AS sf_challan_no,
             {lathe_select},
