@@ -11,6 +11,14 @@ frappe.ui.form.on("Work Order", {
                 fetch_fifo_batches_for_all_items(frm);
             }, 300);
         }
+        if (frm.doc.custom_total_mold_weight && frm.doc.required_items && frm.doc.required_items.length) {
+            frm.doc.required_items.forEach(row => {
+                if (row.custom_required_qty_1 !== frm.doc.custom_total_mold_weight) {
+                    frappe.model.set_value(row.doctype, row.name, 'custom_required_qty_1', frm.doc.custom_total_mold_weight);
+                }
+            });
+            frm.refresh_field('required_items');
+        }
         // frm.set_query('source_warehouse', () => ({ filters: { custom_batch_making: 1 } }));
         // frm.set_query('source_warehouse', 'required_items', () => ({ filters: { custom_batch_making: 1 } }));
         // frm.set_query('fg_warehouse', () => ({ filters: { custom_molding: 1 } }));
@@ -104,7 +112,9 @@ frappe.ui.form.on("Work Order", {
     custom_weight(frm) { 
         calculate_total_mold_weight(frm); 
     },
-    
+    required_items_add(frm, cdt, cdn) {
+        calculate_total_mold_weight(frm);
+    },
     custom_sub_work_order_type(frm) { 
         update_item_values(frm, false); 
         set_processes(frm);
@@ -220,6 +230,7 @@ frappe.ui.form.on("Work Order", {
 frappe.ui.form.on('Work Order Item', {
     item_code(frm, cdt, cdn) {
         update_item_values(frm, false);
+        
     },
 
     source_warehouse(frm, cdt, cdn) {
@@ -371,17 +382,18 @@ function calculate_total_mold_weight(frm) {
     let mold = (bush_qty * weight).toFixed(3);
     
     frm.set_value('custom_total_mold_weight', mold);
-    // frm.set_value('qty', mold);
+    
+    if (!frm.doc.required_items || !frm.doc.required_items.length) return;
+    
     frm.doc.required_items.forEach(row => {
-        frappe.model.set_value(row.doctype, row.name, 'custom_required_qty_1', mold);
         frappe.model.set_value(row.doctype, row.name, 'custom_batch_no', '');
     });
+    frm.refresh_field('required_items');
     
     setTimeout(() => {
         fetch_fifo_batches_for_all_items(frm);
     }, 300);
 }
-
 function fetch_fifo_batches_for_all_items(frm) {
     if (!frm.doc.required_items || frm.doc.required_items.length === 0) {
         return;
