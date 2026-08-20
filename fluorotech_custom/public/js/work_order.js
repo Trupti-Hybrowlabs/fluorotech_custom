@@ -546,7 +546,7 @@ function set_cic_processes(frm) {
     if (frm.doc.custom_series !== 'CIC.####') return;
     if (!frm.doc.custom_enable_process) return;  
 
-    const processes = ['Lathe', 'CNC', 'VMC'];
+    const processes = ['Lathe', 'CNC', 'VMC',  'Deburing'];
 
     const existing = (frm.doc.custom_process || []).map(r => r.cic_process_ct);
     processes
