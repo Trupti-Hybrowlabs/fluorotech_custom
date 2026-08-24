@@ -8,8 +8,7 @@
  "field_order": [
   "type",
   "description",
-  "from_operation",
-  "to_operation"
+  "operations"
  ],
  "fields": [
   {
@@ -24,20 +23,16 @@
    "label": "Family Description"
   },
   {
-   "fieldname": "from_operation",
-   "fieldtype": "Int",
-   "label": "From Operation"
-  },
-  {
-   "fieldname": "to_operation",
-   "fieldtype": "Int",
-   "label": "To Operation"
+   "fieldname": "operations",
+   "fieldtype": "Table",
+   "label": "Operations",
+   "options": "No of Operations CT"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-20 11:16:13.840880",
+ "modified": "2026-08-24 14:21:06.786724",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "No of Operations",
