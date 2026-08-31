@@ -101,14 +101,27 @@ def get_columns():
         
         {
             "fieldname": "posting_date",
-            "label": _("Date"),
+            "label": _("Stock Entry Date"),
             "fieldtype": "Date",
             "width": 150
         },
+
         {
             "fieldname": "posting_time",
             "label": _("Time"),
             "fieldtype": "Time",
+            "width": 120
+        },
+        {
+            "fieldname": "production_date_ct",
+            "label": _("Production Date"),
+            "fieldtype": "Date",
+            "width": 130
+        },
+        {
+            "fieldname": "production_qty",
+            "label": _("Production Qty"),
+            "fieldtype": "Float",
             "width": 120
         },
         {
@@ -216,7 +229,54 @@ def get_data(filters):
         as_dict=1
     )
 
-    return data
+    work_orders = list(set([d.work_order for d in data if d.work_order]))
+    production_dates_map = {}
+
+    if work_orders:
+        production_data = frappe.db.sql(
+            """
+            SELECT
+                parent,
+                production_date,
+                accepted_qty
+            FROM
+                `tabDaily Production CT`
+            WHERE
+                parent IN %(work_orders)s
+            ORDER BY
+                parent, idx
+            """,
+            {"work_orders": work_orders},
+            as_dict=1
+        )
+
+        for pd in production_data:
+            production_dates_map.setdefault(pd.parent, []).append(
+                {"production_date": pd.production_date, "production_qty": pd.accepted_qty}
+            )
+
+    final_data = []
+    for row in data:
+        entries = production_dates_map.get(row.work_order, [])
+
+        if not entries:
+            row["production_date_ct"] = None
+            row["production_qty"] = None
+            final_data.append(row)
+        else:
+            for idx, entry in enumerate(entries):
+                if idx == 0:
+                    row["production_date_ct"] = entry["production_date"]
+                    row["production_qty"] = entry["production_qty"]
+                    final_data.append(row)
+                else:
+                    blank_row = {
+                        "production_date_ct": entry["production_date"],
+                        "production_qty": entry["production_qty"]
+                    }
+                    final_data.append(blank_row)
+
+    return final_data
 
 
 def get_conditions(filters):
