@@ -1,4 +1,6 @@
 import frappe
+import urllib.parse
+from frappe.utils import get_url
 
 @frappe.whitelist()
 def get_od_values(range_of_size):
@@ -93,52 +95,30 @@ def set_job_numbers(doc, method):
     if doc.get('production_plan_sub_assembly_item') and doc.get('sales_order'):
         doc.sales_order = None
 
-
-import base64
-import io
-import urllib.parse
-from frappe.utils import get_url
-
-try:
-    import qrcode
-except ImportError:
-    qrcode = None
-
-
-def generate_qr_code_base64(url):
-    img = qrcode.make(url)
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{base64_str}"
-
-
 @frappe.whitelist()
 def generate_work_order_qr_code(work_order_name):
     try:
         if not work_order_name:
             frappe.throw("Work Order name is required")
 
-        if qrcode is None:
-            frappe.throw("qrcode library is not installed on server")
-
         base_url = get_url()
         redirect_to = f"/app/work-order/{urllib.parse.quote(str(work_order_name))}"
         full_url = f"{base_url}{redirect_to}"
 
-        qr_base64 = generate_qr_code_base64(full_url)
+        encoded_url = urllib.parse.quote(full_url, safe='')
+        qr_image_url = f"https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={encoded_url}"
 
         frappe.db.set_value(
             "Work Order",
             work_order_name,
             "custom_production_qr_image",
-            qr_base64,
+            qr_image_url,
             update_modified=False
         )
         frappe.db.commit()
 
         return {
-            "work_order_qr": qr_base64,
+            "work_order_qr": qr_image_url,
             "work_order_name": work_order_name
         }
 
