@@ -9,15 +9,15 @@
   "process_ct",
   "completed",
   "date",
+  "qty_produced",
   "rejected",
   "rejection_qty",
-  "remark",
-  "qty_produced",
-  "qty_accepted"
+  "qty_accepted",
+  "remark"
  ],
  "fields": [
   {
-   "columns": 3,
+   "columns": 2,
    "fieldname": "process_ct",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -25,7 +25,7 @@
   },
   {
    "allow_on_submit": 1,
-   "columns": 3,
+   "columns": 2,
    "fieldname": "date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -33,7 +33,7 @@
   },
   {
    "allow_on_submit": 1,
-   "columns": 2,
+   "columns": 1,
    "depends_on": "eval:doc.rejected == 1",
    "fieldname": "rejection_qty",
    "fieldtype": "Float",
@@ -41,6 +41,7 @@
   },
   {
    "allow_on_submit": 1,
+   "columns": 1,
    "depends_on": "eval:doc.rejected == 1",
    "fieldname": "remark",
    "fieldtype": "Small Text",
@@ -48,7 +49,7 @@
   },
   {
    "allow_on_submit": 1,
-   "columns": 2,
+   "columns": 1,
    "default": "0",
    "fieldname": "completed",
    "fieldtype": "Check",
@@ -57,6 +58,7 @@
   },
   {
    "allow_on_submit": 1,
+   "columns": 1,
    "default": "0",
    "fieldname": "rejected",
    "fieldtype": "Check",
@@ -65,6 +67,7 @@
   },
   {
    "allow_on_submit": 1,
+   "columns": 1,
    "fieldname": "qty_produced",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -72,17 +75,19 @@
   },
   {
    "allow_on_submit": 1,
+   "columns": 1,
    "fieldname": "qty_accepted",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Qty Accepted"
+   "label": "Qty Accepted",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-06 19:53:02.545518",
+ "modified": "2026-08-25 14:26:36.428532",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Process CT",

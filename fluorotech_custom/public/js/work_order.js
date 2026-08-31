@@ -599,3 +599,90 @@ function calculate_qty_accepted(frm, cdt, cdn) {
     frappe.model.set_value(cdt, cdn, 'qty_accepted', qty_accepted);
     frm.refresh_field('custom_process');
 }
+
+frappe.ui.form.on('Work Order', {
+    onload: function(frm) {
+        if (!frm.is_new() && !frm._wo_qr_loaded) {
+            load_work_order_qr_code(frm);
+        } else if (!frm.is_new() && frm._wo_qr_loaded) {
+            restore_work_order_qr_from_cache(frm);
+        } else {
+            show_wo_qr_empty_state(frm);
+        }
+    },
+    refresh: function(frm) {
+        if (!frm.is_new() && !frm._wo_qr_loaded) {
+            load_work_order_qr_code(frm);
+        } else if (!frm.is_new() && frm._wo_qr_loaded) {
+            restore_work_order_qr_from_cache(frm);
+        } else {
+            show_wo_qr_empty_state(frm);
+        }
+    },
+    after_save: function(frm) {
+        frm._wo_qr_loaded = false;
+        frm._cached_wo_qr_data = null;
+        load_work_order_qr_code(frm);
+    }
+});
+function load_work_order_qr_code(frm) {
+    frappe.call({
+        method: 'fluorotech_custom.config.py.work_order.generate_work_order_qr_code',
+        args: {
+            work_order_name: frm.doc.name
+        },
+        callback: function(response) {
+            if (response.message && response.message.work_order_qr) {
+                let qr_data = response.message.work_order_qr;
+                frm._cached_wo_qr_data = qr_data;
+                frm._wo_qr_loaded = true;
+                render_wo_qr_html(frm, qr_data);
+            } else {
+                frm._wo_qr_loaded = false;
+                frm._cached_wo_qr_data = null;
+                show_wo_qr_empty_state(frm);
+            }
+        },
+        error: function(err) {
+            frm._wo_qr_loaded = false;
+            frm._cached_wo_qr_data = null;
+            console.error('Error fetching Work Order QR code:', err);
+            frm.fields_dict.custom_production_qr_code.$wrapper.html(
+                `<p class="text-muted">Failed to load QR code. Please refresh.</p>`
+            );
+        }
+    });
+}
+function restore_work_order_qr_from_cache(frm) {
+    if (frm._cached_wo_qr_data) {
+        render_wo_qr_html(frm, frm._cached_wo_qr_data);
+    }
+}
+function render_wo_qr_html(frm, qr_data) {
+    let html = `
+        <div style="text-align:center; padding: 15px; background:#f8f9fa; border-radius:8px; margin-top:10px;">
+            <img src="${qr_data}"
+                 style="width:220px; height:220px; border:1px solid #ddd; border-radius:6px; padding:8px; background:white;" />
+            <br>
+            <button class="btn btn-primary btn-sm" id="download_wo_qr" style="margin-top:10px;">
+                <i class="fa fa-download"></i> Download QR Code
+            </button>
+        </div>
+    `;
+    frm.fields_dict.custom_production_qr_code.$wrapper.html(html);
+    setTimeout(() => {
+        $('#download_wo_qr').off('click').on('click', function() {
+            const link = document.createElement('a');
+            link.href = qr_data;
+            link.download = `${frm.doc.name}_QR.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }, 100);
+}
+function show_wo_qr_empty_state(frm) {
+    frm.fields_dict.custom_production_qr_code.$wrapper.html(
+        `<p class="text-muted">QR Code will be generated after the Work Order is saved.</p>`
+    );
+}
