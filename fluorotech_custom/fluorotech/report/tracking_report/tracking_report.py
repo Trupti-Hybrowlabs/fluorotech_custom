@@ -24,12 +24,6 @@ def get_columns():
             "width": 120
         },
         {
-            "label": _("Rejection / Part Qty"),
-            "fieldname": "rejection_part_qty",
-            "fieldtype": "Float",
-            "width": 140
-        },
-        {
             "label": _("PO Enter Date"),
             "fieldname": "po_enter_date",
             "fieldtype": "Date",
@@ -91,6 +85,24 @@ def get_columns():
             "fieldname": "order_qty",
             "fieldtype": "Float",
             "width": 90
+        },
+        {
+            "label": _("POS No"),
+            "fieldname": "pos_no",
+            "fieldtype": "Data",
+            "width": 90
+        },
+        {
+            "label": _("CIC Production Qty"),
+            "fieldname": "cic_production_qty",
+            "fieldtype": "Float",
+            "width": 140
+        },
+        {
+            "label": _("SF Production Qty"),
+            "fieldname": "sf_production_qty",
+            "fieldtype": "Float",
+            "width": 140
         },
         {
             "label": _("Finish Stock Qty"),
@@ -757,9 +769,11 @@ def get_stock_entry_join():
         LEFT JOIN (
             SELECT
                 work_order,
-                MAX(name) AS name
+                MAX(name) AS name,
+                SUM(fg_completed_qty) AS cic_production_qty
             FROM `tabStock Entry`
             WHERE docstatus = 1
+              AND purpose = 'Manufacture'
             GROUP BY work_order
         ) se ON se.work_order = wo.name
     """
@@ -769,9 +783,11 @@ def get_stock_entry_join_sf():
         LEFT JOIN (
             SELECT
                 work_order,
-                MAX(name) AS name
+                MAX(name) AS name,
+                SUM(fg_completed_qty) AS sf_production_qty
             FROM `tabStock Entry`
             WHERE docstatus = 1
+              AND purpose = 'Manufacture'
             GROUP BY work_order
         ) se2 ON se2.work_order = wo2.name
     """
@@ -816,6 +832,13 @@ def get_delivery_note_join():
         ) dn ON dn.wo_name = wo.name
     """
 
+def get_ppr_join():
+    return """
+        LEFT JOIN `tabProduction Plan Item Reference` ppr
+            ON  ppr.sales_order = soi.parent
+            AND ppr.qty         = soi.qty
+    """
+
 def get_data(filters):
     conditions = ""
     values = {}
@@ -858,6 +881,7 @@ def get_data(filters):
     query1 = """
         SELECT
             soi.custom_job_number                               AS job_no,
+            soi.custom_pos_no                                   AS pos_no,
             so.transaction_date                                 AS po_enter_date,
             soi.custom_type                                     AS dev_or_production,
             so.customer                                         AS customer,
@@ -874,7 +898,6 @@ def get_data(filters):
             so.delivery_date                                    AS delivery_date,
             soi.rate                                            AS rate_per_piece,
             soi.amount                                          AS total_cost,
-            NULL                                                AS rejection_part_qty,
             NULL                                                AS dwg_available,
             NULL                                                AS finish_stock_qty,
             NULL                                                AS quality_accepted_qty,
@@ -901,6 +924,8 @@ def get_data(filters):
             qi_pivot_sf.stage_rejected_qty,
             qi_pivot_sf.stage_rejection_reason AS stage_rejection_reason,
             wo.custom_challan_no  AS cic_challan_no,
+            se.cic_production_qty                              AS cic_production_qty,
+            se2.sf_production_qty                              AS sf_production_qty,
             wo2.custom_challan_no AS sf_challan_no,
             {lathe_select},
             {cnc_select},
@@ -921,10 +946,16 @@ def get_data(filters):
             NULL AS delivery_rating,
             wo.name                                             AS work_order_id
         FROM
-            `tabProduction Plan Item` ppi
-        INNER JOIN `tabSales Order`      so  ON so.name  = ppi.sales_order
-        INNER JOIN `tabSales Order Item` soi ON soi.name = ppi.sales_order_item
-        LEFT  JOIN `tabWork Order`       wo
+            `tabSales Order Item` soi
+        INNER JOIN `tabSales Order` so ON so.name = soi.parent
+        {ppr_join}
+        LEFT JOIN `tabProduction Plan Item` ppi
+            ON  ppi.item_code = soi.item_code
+            AND (
+                ppi.sales_order = soi.parent
+                OR ppi.parent = ppr.parent
+            )
+        LEFT JOIN `tabWork Order` wo
             ON  wo.production_plan      = ppi.parent
             AND wo.production_plan_item = ppi.name
         LEFT JOIN `tabProduction Plan Sub Assembly Item` ppsa
@@ -932,12 +963,12 @@ def get_data(filters):
         LEFT JOIN `tabWork Order` wo2
             ON  wo2.production_plan                   = ppi.parent
             AND wo2.production_plan_sub_assembly_item = ppsa.name
-            AND wo2.docstatus = 1
+            AND wo2.docstatus != 2
         {process_joins}
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
-            AND wo.docstatus = 1
+            AND wo.docstatus != 2
             {conditions}
     """.format(
         sint_select=sint_select,
@@ -947,6 +978,7 @@ def get_data(filters):
         cnc_select=cnc_select,
         vnc_select=vnc_select,
         process_joins=process_joins,
+        ppr_join=get_ppr_join(),
         conditions=conditions
     )
 
