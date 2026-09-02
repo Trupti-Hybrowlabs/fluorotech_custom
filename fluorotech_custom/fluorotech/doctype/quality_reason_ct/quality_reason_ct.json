@@ -12,10 +12,9 @@
  "fields": [
   {
    "fieldname": "reason",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Reason",
-   "options": "Quality Reason"
+   "label": "Reason"
   },
   {
    "fieldname": "rejected_qty",
@@ -28,7 +27,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-01 20:03:10.195962",
+ "modified": "2026-09-01 21:35:01.888014",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Quality Reason CT",
