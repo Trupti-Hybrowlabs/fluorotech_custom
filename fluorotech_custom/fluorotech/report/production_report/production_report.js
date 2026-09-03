@@ -28,12 +28,6 @@ frappe.query_reports["Production Report"] = {
             label: __("Item Code"),
             fieldtype: "Link",
             options: "Item"
-        },
-        {
-            fieldname: "stock_entry_type",
-            label: __("Stock Entry Type"),
-            fieldtype: "Select",
-            options: "\nMaterial Transfer for Manufacture\nManufacture"
         }
     ]
 };

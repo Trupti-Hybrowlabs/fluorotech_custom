@@ -5,6 +5,12 @@ frappe.ui.form.on('Production Plan', {
                 fetch_job_details(frm);
             }, 1500);
         });
+
+        frm.page.wrapper.on('click', '[data-fieldname="get_items"]', function() {
+            setTimeout(() => {
+                fetch_job_details_for_po_items(frm);
+            }, 1500);
+        });
     }
 });
 
@@ -49,4 +55,42 @@ function fetch_job_details(frm) {
     });
 
     frm.refresh_field("sales_orders");
+}
+
+
+function fetch_job_details_for_po_items(frm) {
+
+    (frm.doc.po_items || []).forEach(row => {
+
+        if (row.sales_order_item) {
+
+            frappe.call({
+                method: "fluorotech_custom.config.py.sales_order.get_job_number_from_so_item",
+                args: {
+                    sales_order_item: row.sales_order_item
+                },
+                callback: function(r) {
+                    if (r.message) {
+
+                        frappe.model.set_value(
+                            row.doctype,
+                            row.name,
+                            "custom_job_number",
+                            r.message.custom_job_number || ""
+                        );
+
+                        frappe.model.set_value(
+                            row.doctype,
+                            row.name,
+                            "custom_pos_no",
+                            r.message.custom_pos_no || ""
+                        );
+                    }
+                }
+            });
+
+        }
+    });
+
+    frm.refresh_field("po_items");
 }

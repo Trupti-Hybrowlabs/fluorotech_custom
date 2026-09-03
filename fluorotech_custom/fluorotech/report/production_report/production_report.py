@@ -67,12 +67,12 @@ def get_columns():
             "fieldtype": "Data",
             "width": 200
         },
-         {
-            "fieldname": "wo_qty",
-            "label": _("Planned Qty"),
-            "fieldtype": "Float",
-            "width": 120
-        },
+        #  {
+        #     "fieldname": "wo_qty",
+        #     "label": _("Planned Qty"),
+        #     "fieldtype": "Float",
+        #     "width": 120
+        # },
         {
             "fieldname": "wo_qty",
             "label": _("Qty To Manufacture"),
@@ -80,38 +80,32 @@ def get_columns():
             "width": 120
         },
        
-        {
-            "fieldname": "qty",
-            "label": _("Manufactured Qty"),
-            "fieldtype": "Float",
-            "width": 100
-        },
-        {
-            "fieldname": "rejection_qty",
-            "label": _("Rejection Qty"),
-            "fieldtype": "Float",
-            "width": 120
-        },
-        {
-            "fieldname": "uom",
-            "label": _("UOM"),
-            "fieldtype": "Data",
-            "width": 80
-        },
+        # {
+        #     "fieldname": "qty",
+        #     "label": _("Manufactured Qty"),
+        #     "fieldtype": "Float",
+        #     "width": 100
+        # },
+        # {
+        #     "fieldname": "uom",
+        #     "label": _("UOM"),
+        #     "fieldtype": "Data",
+        #     "width": 80
+        # },
         
-        {
-            "fieldname": "posting_date",
-            "label": _("Stock Entry Date"),
-            "fieldtype": "Date",
-            "width": 150
-        },
+        # {
+        #     "fieldname": "posting_date",
+        #     "label": _("Stock Entry Date"),
+        #     "fieldtype": "Date",
+        #     "width": 150
+        # },
 
-        {
-            "fieldname": "posting_time",
-            "label": _("Time"),
-            "fieldtype": "Time",
-            "width": 120
-        },
+        # {
+        #     "fieldname": "posting_time",
+        #     "label": _("Time"),
+        #     "fieldtype": "Time",
+        #     "width": 120
+        # },
         {
             "fieldname": "production_date_ct",
             "label": _("Production Date"),
@@ -121,6 +115,12 @@ def get_columns():
         {
             "fieldname": "production_qty",
             "label": _("Production Qty"),
+            "fieldtype": "Float",
+            "width": 120
+        },
+        {
+            "fieldname": "rejection_qty",
+            "label": _("Rejection Qty"),
             "fieldtype": "Float",
             "width": 120
         },
@@ -168,11 +168,6 @@ def get_data(filters):
             se.posting_date               AS posting_date,
             wo.custom_mounlding_press_mc  AS moulding_press_mc,
             se.posting_time               AS posting_time,
-            CASE
-                WHEN sed.item_code = wo.production_item
-                THEN COALESCE(pt.total_rejection_qty, 0)
-                ELSE NULL
-            END                           AS rejection_qty,
             CASE
                 WHEN sed.item_code = wo.production_item
                 THEN pt.remarks
@@ -238,7 +233,8 @@ def get_data(filters):
             SELECT
                 parent,
                 production_date,
-                accepted_qty
+                accepted_qty,
+                rejected_qty
             FROM
                 `tabDaily Production CT`
             WHERE
@@ -252,7 +248,7 @@ def get_data(filters):
 
         for pd in production_data:
             production_dates_map.setdefault(pd.parent, []).append(
-                {"production_date": pd.production_date, "production_qty": pd.accepted_qty}
+                {"production_date": pd.production_date, "production_qty": pd.accepted_qty, "rejection_qty": pd.rejected_qty}
             )
 
     final_data = []
@@ -262,17 +258,20 @@ def get_data(filters):
         if not entries:
             row["production_date_ct"] = None
             row["production_qty"] = None
+            row["rejection_qty"] = None
             final_data.append(row)
         else:
             for idx, entry in enumerate(entries):
                 if idx == 0:
                     row["production_date_ct"] = entry["production_date"]
                     row["production_qty"] = entry["production_qty"]
+                    row["rejection_qty"] = entry["rejection_qty"]
                     final_data.append(row)
                 else:
                     blank_row = {
                         "production_date_ct": entry["production_date"],
-                        "production_qty": entry["production_qty"]
+                        "production_qty": entry["production_qty"],
+                        "rejection_qty": entry["rejection_qty"]
                     }
                     final_data.append(blank_row)
 
@@ -282,7 +281,7 @@ def get_data(filters):
 def get_conditions(filters):
     conditions = ""
 
-    conditions += " AND se.stock_entry_type IN ('Material Transfer for Manufacture', 'Manufacture')"
+    conditions += " AND se.stock_entry_type = 'Manufacture'"
 
     if filters.get("from_date"):
         conditions += " AND se.posting_date >= %(from_date)s"
@@ -295,8 +294,5 @@ def get_conditions(filters):
 
     if filters.get("item_code"):
         conditions += " AND sed.item_code = %(item_code)s"
-
-    if filters.get("stock_entry_type"):
-        conditions += " AND se.stock_entry_type = %(stock_entry_type)s"
 
     return conditions

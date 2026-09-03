@@ -74,12 +74,12 @@ def get_columns():
             "fieldtype": "Data",
             "width": 130
         },
-        {
-            "label": _("Dwg No. Avail/Not"),
-            "fieldname": "dwg_available",
-            "fieldtype": "Data",
-            "width": 130
-        },
+        # {
+        #     "label": _("Dwg No. Avail/Not"),
+        #     "fieldname": "dwg_available",
+        #     "fieldtype": "Data",
+        #     "width": 130
+        # },
         {
             "label": _("Order Qty"),
             "fieldname": "order_qty",
@@ -92,38 +92,38 @@ def get_columns():
             "fieldtype": "Data",
             "width": 90
         },
-        {
-            "label": _("CIC Production Qty"),
-            "fieldname": "cic_production_qty",
-            "fieldtype": "Float",
-            "width": 140
-        },
-        {
-            "label": _("SF Production Qty"),
-            "fieldname": "sf_production_qty",
-            "fieldtype": "Float",
-            "width": 140
-        },
+        # {
+        #     "label": _("CIC Production Qty"),
+        #     "fieldname": "cic_production_qty",
+        #     "fieldtype": "Float",
+        #     "width": 140
+        # },
+        # {
+        #     "label": _("SF Production Qty"),
+        #     "fieldname": "sf_production_qty",
+        #     "fieldtype": "Float",
+        #     "width": 140
+        # },
         {
             "label": _("Finish Stock Qty"),
             "fieldname": "finish_stock_qty",
             "fieldtype": "Float",
             "width": 120
         },
+        # {
+        #     "label": _("Quality Accepted Qty"),
+        #     "fieldname": "quality_accepted_qty",
+        #     "fieldtype": "Float",
+        #     "width": 140
+        # },
+        # {
+        #     "label": _("Finish Stock Rejected Qty"),
+        #     "fieldname": "finish_stock_rejected_qty",
+        #     "fieldtype": "Float",
+        #     "width": 170
+        # },
         {
-            "label": _("Quality Accepted Qty"),
-            "fieldname": "quality_accepted_qty",
-            "fieldtype": "Float",
-            "width": 140
-        },
-        {
-            "label": _("Finish Stock Rejected Qty"),
-            "fieldname": "finish_stock_rejected_qty",
-            "fieldtype": "Float",
-            "width": 170
-        },
-        {
-            "label": _("Moulding Qty"),
+            "label": _("Moulding Qty Required"),
             "fieldname": "moulding_qty",
             "fieldtype": "Float",
             "width": 110
@@ -164,12 +164,12 @@ def get_columns():
             "fieldtype": "Date",
             "width": 110
         },
-        {
-            "label": _("No of Days for Dispatch"),
-            "fieldname": "no_of_days_for_dispatch",
-            "fieldtype": "Int",
-            "width": 160
-        },
+        # {
+        #     "label": _("No of Days for Dispatch"),
+        #     "fieldname": "no_of_days_for_dispatch",
+        #     "fieldtype": "Int",
+        #     "width": 160
+        # },
         {
             "label": _("Rate per Piece"),
             "fieldname": "rate_per_piece",
@@ -189,6 +189,13 @@ def get_columns():
             "fieldname": "production_plan_no",
             "fieldtype": "Data",
             "width": 140
+        },
+        {
+            "label": _("Work Order"),
+            "fieldname": "work_order_id",
+            "fieldtype": "Link",
+            "options": "Work Order",
+            "width": 160
         },
         {
             "label": _("Moulding Production Plan Date"),
@@ -576,12 +583,12 @@ def get_columns():
             "fieldtype": "Currency",
             "width": 140
         },
-        {
-            "label": _("Inspected By"),
-            "fieldname": "inspected_by",
-            "fieldtype": "Data",
-            "width": 130
-        },
+        # {
+        #     "label": _("Inspected By"),
+        #     "fieldname": "inspected_by",
+        #     "fieldtype": "Data",
+        #     "width": 130
+        # },
 
         # ── DISPATCH ─────────────────────────────────────────────────────
         {
@@ -620,13 +627,7 @@ def get_columns():
             "fieldtype": "Data",
             "width": 120
         },
-        # {
-        #     "label": _("Work Order"),
-        #     "fieldname": "work_order_id",
-        #     "fieldtype": "Link",
-        #     "options": "Work Order",
-        #     "width": 160
-        # },
+        
     ]
 
 
@@ -989,4 +990,8 @@ def get_data(filters):
     """.format(q1=query1)
 
     data = frappe.db.sql(full_sql, values, as_dict=1)
+
+    for row in data:
+        row["moulding_qty"] = (row.get("finish_stock_qty") or 0) - (row.get("order_qty") or 0)
+
     return data
