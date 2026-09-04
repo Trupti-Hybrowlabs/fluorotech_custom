@@ -79,6 +79,13 @@ def get_columns():
             "fieldtype": "Float",
             "width": 120
         },
+        {
+            "fieldname": "moulding_press_mc",
+            "label": _("Moulding Press Mc"),
+            "fieldtype": "Link",
+            "options": "Asset",
+            "width": 160
+        },
        
         # {
         #     "fieldname": "qty",
@@ -124,13 +131,7 @@ def get_columns():
             "fieldtype": "Float",
             "width": 120
         },
-        {
-            "fieldname": "moulding_press_mc",
-            "label": _("Moulding Press Mc"),
-            "fieldtype": "Link",
-            "options": "Asset",
-            "width": 160
-        },
+       
         # {
         #     "fieldname": "job_no",
         #     "label": _("Job No"),
@@ -268,12 +269,11 @@ def get_data(filters):
                     row["rejection_qty"] = entry["rejection_qty"]
                     final_data.append(row)
                 else:
-                    blank_row = {
-                        "production_date_ct": entry["production_date"],
-                        "production_qty": entry["production_qty"],
-                        "rejection_qty": entry["rejection_qty"]
-                    }
-                    final_data.append(blank_row)
+                    new_row = row.copy()
+                    new_row["production_date_ct"] = entry["production_date"]
+                    new_row["production_qty"] = entry["production_qty"]
+                    new_row["rejection_qty"] = entry["rejection_qty"]
+                    final_data.append(new_row)
 
     return final_data
 
@@ -282,6 +282,8 @@ def get_conditions(filters):
     conditions = ""
 
     conditions += " AND se.stock_entry_type = 'Manufacture'"
+    conditions += " AND wo.custom_series = 'SF.####'"
+    conditions += " AND sed.item_code = wo.production_item"
 
     if filters.get("from_date"):
         conditions += " AND se.posting_date >= %(from_date)s"
