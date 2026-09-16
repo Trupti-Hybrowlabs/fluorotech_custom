@@ -13,7 +13,7 @@
   "rejected",
   "rejection_qty",
   "qty_accepted",
-  "remark"
+  "reason"
  ],
  "fields": [
   {
@@ -38,14 +38,6 @@
    "fieldname": "rejection_qty",
    "fieldtype": "Float",
    "label": "Rejection Qty"
-  },
-  {
-   "allow_on_submit": 1,
-   "columns": 1,
-   "depends_on": "eval:doc.rejected == 1",
-   "fieldname": "remark",
-   "fieldtype": "Small Text",
-   "label": "Remark"
   },
   {
    "allow_on_submit": 1,
@@ -81,13 +73,19 @@
    "in_list_view": 1,
    "label": "Qty Accepted",
    "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Link",
+   "label": "Reason",
+   "options": "Process Tracking Reason"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-25 14:26:36.428532",
+ "modified": "2026-09-16 09:31:46.622935",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Process CT",

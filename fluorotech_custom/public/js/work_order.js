@@ -34,21 +34,21 @@ frappe.ui.form.on("Work Order", {
     
     custom_mounlding_press_mc(frm) { 
         calculate_item_pressure(frm); 
-        calculate_pressure_two(frm);
+        // calculate_pressure_two(frm);
     },
     
     custom_od(frm) { 
         calculate_item_pressure(frm);
         calculate_pressure_in_kg(frm);
         calculate_weight(frm);
-        calculate_pressure_two(frm); 
+        // calculate_pressure_two(frm); 
     },
     
     custom_id(frm) { 
         calculate_item_pressure(frm);
         calculate_pressure_in_kg(frm);
         calculate_weight(frm);
-        calculate_pressure_two(frm); 
+        // calculate_pressure_two(frm); 
     },
     
     custom_material_pressure(frm) { 
@@ -61,14 +61,19 @@ frappe.ui.form.on("Work Order", {
     
     custom_material_pressure_two(frm) { 
         calculate_pressure_in_kg(frm); 
-        calculate_pressure_two(frm); 
+        // calculate_pressure_two(frm); 
     },
     
     custom_length_(frm) {
         calculate_item_pressure(frm);
         calculate_pressure_in_kg(frm);
         calculate_weight(frm);
-        calculate_pressure_two(frm); 
+        // calculate_pressure_two(frm); 
+    },
+
+    custom_item_pressure(frm) {
+        let rounded_pressure = Math.round(flt(frm.doc.custom_item_pressure));
+        frm.set_value('custom_pressure_two', rounded_pressure ? rounded_pressure / 2 : 0);
     },
     
     custom_density(frm) { 
@@ -332,9 +337,9 @@ function calculate_item_pressure(frm) {
     calculate_pressure(frm, 'custom_item_pressure', 'custom_material_pressure', 'custom_mounlding_press_mc');
 }
 
-function calculate_pressure_two(frm) {
-    calculate_pressure(frm, 'custom_pressure_two', 'custom_material_pressure_two', 'custom_mounlding_press_mc');
-}
+// function calculate_pressure_two(frm) {
+//     calculate_pressure(frm, 'custom_pressure_two', 'custom_material_pressure_two', 'custom_mounlding_press_mc');
+// }
 
 function calculate_pressure_in_kg(frm) {
     calculate_pressure(frm, 'custom_pressure_in_kg', 'custom_material_pressure_two', 'custom_press_mc_no');
