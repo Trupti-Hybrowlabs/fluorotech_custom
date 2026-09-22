@@ -1049,7 +1049,7 @@ def get_data(filters):
     data = frappe.db.sql(full_sql, values, as_dict=1)
 
     for row in data:
-        row["moulding_qty"] = (row.get("order_qty") or 0) - (row.get("finish_stock_qty") or 0)
+        row["moulding_qty"] = abs((row.get("finish_stock_qty") or 0) - (row.get("order_qty") or 0))
 
     seen_work_orders = set()
     deduped_data = []
