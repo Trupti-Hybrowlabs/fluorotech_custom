@@ -632,111 +632,143 @@ def get_columns():
 
 
 def get_sintering_straightening_select():
-    """
-    Returns the SELECT expressions for Sintering and Straightening
-    from the custom_process_tracking child table (Process CT doctype).
-    
-    Process CT fields:
-        process_ct      -> process name (e.g. 'Sintering', 'Straightening')
-        date            -> date of process
-        qty_produced    -> qty produced
-        rejection_qty   -> qty rejected
-        qty_accepted    -> qty accepted
-        remark          -> rejection reason
-        completed       -> check (1/0)
-        rejected        -> check (1/0)
-    
-    parentfield = 'custom_process_tracking'  <-- THIS was the missing piece
-    parenttype  = 'Work Order'
-    """
     sintering = """
-        wo_sint.date                                        AS sintering_plan_date,
-        DATE_ADD(wo_sint.date, INTERVAL 1 DAY)             AS sintering_done_date,
-        wo2.custom_oven_no                                   AS sintering_oven_no,
-        wo_sint.qty_produced                               AS sintering_qty_produced,
-        wo_sint.rejection_qty                              AS sintering_qty_rejected,
-        wo_sint.qty_accepted                               AS sintering_qty_accepted,
-        wo_sint.remark                                     AS sintering_rejection_reason"""
+        wo_sint.sintering_plan_date,
+        DATE_ADD(wo_sint.sintering_plan_date, INTERVAL 1 DAY) AS sintering_done_date,
+        wo2.custom_oven_no AS sintering_oven_no,
+        wo_sint.sintering_qty_produced,
+        wo_sint.sintering_qty_rejected,
+        wo_sint.sintering_qty_accepted,
+        wo_sint.sintering_rejection_reason"""
 
     straightening = """
-        wo_str.date                                        AS straightening_plan_date,
-        DATE_ADD(wo_str.date, INTERVAL 1 DAY)             AS straightening_done_date,
-        wo2.custom_oven_no                                  AS straightening_oven_no,
-        wo_str.qty_produced                               AS straightening_qty_produced,
-        wo_str.rejection_qty                              AS straightening_qty_rejected,
-        wo_str.qty_accepted                               AS straightening_qty_accepted,
-        wo_str.remark                                     AS straightening_rejection_reason"""
+        wo_str.straightening_plan_date,
+        DATE_ADD(wo_str.straightening_plan_date, INTERVAL 1 DAY) AS straightening_done_date,
+        wo2.custom_oven_no AS straightening_oven_no,
+        wo_str.straightening_qty_produced,
+        wo_str.straightening_qty_rejected,
+        wo_str.straightening_qty_accepted,
+        wo_str.straightening_rejection_reason"""
 
     molding = """
-        wo_mold.date           AS moulding_date,
-        wo_mold.qty_produced   AS moulding_qty_produced,
-        wo_mold.rejection_qty  AS moulding_qty_rejected,
-        wo_mold.qty_accepted   AS moulding_qty_accepted,
-        wo_mold.remark         AS moulding_rejection_reason"""
+        wo_mold.moulding_date,
+        wo_mold.moulding_qty_produced,
+        wo_mold.moulding_qty_rejected,
+        wo_mold.moulding_qty_accepted,
+        wo_mold.moulding_rejection_reason"""
 
     lathe = """
-        NULL                        AS lathe_production_plan_date,
-        wo_lathe.production_date   AS lathe_production_date,
-        wo_lathe.machine_no        AS lathe_machine_no,
-        wo_lathe.qty_produced      AS lathe_qty_produced,
-        wo_lathe.qty_rejected      AS lathe_qty_rejected,
-        wo_lathe.qty_accepted      AS lathe_qty_accepted,
-        wo_lathe.rejection_reason  AS lathe_rejection_reason"""
+        NULL AS lathe_production_plan_date,
+        wo_lathe.lathe_production_date,
+        wo_lathe.lathe_machine_no,
+        wo_lathe.lathe_qty_produced,
+        wo_lathe.lathe_qty_rejected,
+        wo_lathe.lathe_qty_accepted,
+        wo_lathe.lathe_rejection_reason"""
 
     cnc = """
-        NULL                        AS cnc_production_plan_date,
-        wo_cnc.production_date     AS cnc_production_date,
-        wo_cnc.machine_no          AS cnc_machine_no,
-        wo_cnc.qty_produced        AS cnc_qty_produced,
-        wo_cnc.qty_rejected        AS cnc_qty_rejected,
-        wo_cnc.qty_accepted        AS cnc_qty_accepted,
-        wo_cnc.rejection_reason    AS cnc_rejection_reason"""
+        NULL AS cnc_production_plan_date,
+        wo_cnc.cnc_production_date,
+        wo_cnc.cnc_machine_no,
+        wo_cnc.cnc_qty_produced,
+        wo_cnc.cnc_qty_rejected,
+        wo_cnc.cnc_qty_accepted,
+        wo_cnc.cnc_rejection_reason"""
 
     vnc = """
-        NULL                        AS vnc_production_plan_date,
-        wo_vnc.production_date     AS vnc_production_date,
-        wo_vnc.machine_no          AS vnc_machine_no,
-        wo_vnc.qty_produced        AS vnc_qty_produced,
-        wo_vnc.qty_rejected        AS vnc_qty_rejected,
-        wo_vnc.qty_accepted        AS vnc_qty_accepted,
-        wo_vnc.rejection_reason    AS vnc_rejection_reason"""  
+        NULL AS vnc_production_plan_date,
+        wo_vnc.vnc_production_date,
+        wo_vnc.vnc_machine_no,
+        wo_vnc.vnc_qty_produced,
+        wo_vnc.vnc_qty_rejected,
+        wo_vnc.vnc_qty_accepted,
+        wo_vnc.vnc_rejection_reason"""
 
     return sintering, straightening, molding, lathe, cnc, vnc
 
 
 def get_process_ct_joins():
-    """
-    Returns the LEFT JOIN clauses for Sintering and Straightening.
-
-    KEY FIX:  Add  AND wo_sint.parentfield = 'custom_process_tracking'
-              This ensures we only read from the correct child table field,
-              not from any other Process CT usage.
-    """
     return """
-        LEFT JOIN `tabProcess CT` wo_sint
-            ON wo_sint.parent      = wo2.name
-            AND wo_sint.parentfield = 'custom_process_tracking'
-            AND wo_sint.process_ct  = 'Sintering'
-        LEFT JOIN `tabProcess CT` wo_str
-            ON wo_str.parent       = wo2.name
-            AND wo_str.parentfield  = 'custom_process_tracking'
-            AND wo_str.process_ct   = 'Straightening'
-        LEFT JOIN `tabProcess CT` wo_mold
-            ON wo_mold.parent      = wo2.name
-            AND wo_mold.parentfield = 'custom_process_tracking'
-            AND wo_mold.process_ct  = 'Molding'
-        LEFT JOIN `tabCIC Process CT` wo_lathe
-            ON wo_lathe.parent = wo.name
-            AND wo_lathe.parentfield = 'custom_process'
-            AND wo_lathe.cic_process_ct = 'Lathe'
-        LEFT JOIN `tabCIC Process CT` wo_cnc
-            ON wo_cnc.parent = wo.name
-            AND wo_cnc.parentfield = 'custom_process'
-            AND wo_cnc.cic_process_ct = 'CNC'
-        LEFT JOIN `tabCIC Process CT` wo_vnc
-            ON wo_vnc.parent = wo.name
-            AND wo_vnc.parentfield = 'custom_process'
-            AND wo_vnc.cic_process_ct = 'VMC'
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(date) AS sintering_plan_date,
+                SUM(qty_produced) AS sintering_qty_produced,
+                SUM(rejection_qty) AS sintering_qty_rejected,
+                SUM(qty_accepted) AS sintering_qty_accepted,
+                GROUP_CONCAT(DISTINCT remark SEPARATOR ', ') AS sintering_rejection_reason
+            FROM `tabProcess CT`
+            WHERE parentfield = 'custom_process_tracking' AND process_ct = 'Sintering'
+            GROUP BY parent
+        ) wo_sint ON wo_sint.parent = wo2.name
+
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(date) AS straightening_plan_date,
+                SUM(qty_produced) AS straightening_qty_produced,
+                SUM(rejection_qty) AS straightening_qty_rejected,
+                SUM(qty_accepted) AS straightening_qty_accepted,
+                GROUP_CONCAT(DISTINCT remark SEPARATOR ', ') AS straightening_rejection_reason
+            FROM `tabProcess CT`
+            WHERE parentfield = 'custom_process_tracking' AND process_ct = 'Straightening'
+            GROUP BY parent
+        ) wo_str ON wo_str.parent = wo2.name
+
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(date) AS moulding_date,
+                SUM(qty_produced) AS moulding_qty_produced,
+                SUM(rejection_qty) AS moulding_qty_rejected,
+                SUM(qty_accepted) AS moulding_qty_accepted,
+                GROUP_CONCAT(DISTINCT remark SEPARATOR ', ') AS moulding_rejection_reason
+            FROM `tabProcess CT`
+            WHERE parentfield = 'custom_process_tracking' AND process_ct = 'Molding'
+            GROUP BY parent
+        ) wo_mold ON wo_mold.parent = wo2.name
+
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(production_date) AS lathe_production_date,
+                GROUP_CONCAT(DISTINCT machine_no SEPARATOR ', ') AS lathe_machine_no,
+                SUM(qty_produced) AS lathe_qty_produced,
+                SUM(qty_rejected) AS lathe_qty_rejected,
+                SUM(qty_accepted) AS lathe_qty_accepted,
+                GROUP_CONCAT(DISTINCT rejection_reason SEPARATOR ', ') AS lathe_rejection_reason
+            FROM `tabCIC Process CT`
+            WHERE parentfield = 'custom_process' AND cic_process_ct = 'Lathe'
+            GROUP BY parent
+        ) wo_lathe ON wo_lathe.parent = wo.name
+
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(production_date) AS cnc_production_date,
+                GROUP_CONCAT(DISTINCT machine_no SEPARATOR ', ') AS cnc_machine_no,
+                SUM(qty_produced) AS cnc_qty_produced,
+                SUM(qty_rejected) AS cnc_qty_rejected,
+                SUM(qty_accepted) AS cnc_qty_accepted,
+                GROUP_CONCAT(DISTINCT rejection_reason SEPARATOR ', ') AS cnc_rejection_reason
+            FROM `tabCIC Process CT`
+            WHERE parentfield = 'custom_process' AND cic_process_ct = 'CNC'
+            GROUP BY parent
+        ) wo_cnc ON wo_cnc.parent = wo.name
+
+        LEFT JOIN (
+            SELECT
+                parent,
+                MAX(production_date) AS vnc_production_date,
+                GROUP_CONCAT(DISTINCT machine_no SEPARATOR ', ') AS vnc_machine_no,
+                SUM(qty_produced) AS vnc_qty_produced,
+                SUM(qty_rejected) AS vnc_qty_rejected,
+                SUM(qty_accepted) AS vnc_qty_accepted,
+                GROUP_CONCAT(DISTINCT rejection_reason SEPARATOR ', ') AS vnc_rejection_reason
+            FROM `tabCIC Process CT`
+            WHERE parentfield = 'custom_process' AND cic_process_ct = 'VMC'
+            GROUP BY parent
+        ) wo_vnc ON wo_vnc.parent = wo.name
     """
 
 def get_qi_pivot_join():
@@ -793,6 +825,13 @@ def get_stock_entry_join_sf():
         ) se2 ON se2.work_order = wo2.name
     """
 
+def get_bin_join():
+    return """
+        LEFT JOIN `tabBin` bin
+            ON bin.item_code = ppi.item_code
+            AND bin.warehouse = %(finish_warehouse)s
+    """
+
 def get_qi_pivot_join_sf():
     return """
         LEFT JOIN (
@@ -843,6 +882,7 @@ def get_ppr_join():
 def get_data(filters):
     conditions = ""
     values = {}
+    values["finish_warehouse"] = "Finish Stock Store – FEPL"
 
     if filters.get("customer"):
         conditions += " AND so.customer = %(customer)s"
@@ -877,7 +917,7 @@ def get_data(filters):
         values["to_date"] = filters["to_date"]
 
     sint_select, str_select, mold_select, lathe_select, cnc_select, vnc_select = get_sintering_straightening_select()
-    process_joins = get_process_ct_joins() + get_stock_entry_join() + get_qi_pivot_join() + get_stock_entry_join_sf() + get_qi_pivot_join_sf() + get_delivery_note_join()
+    process_joins = get_process_ct_joins() + get_stock_entry_join() + get_qi_pivot_join() + get_stock_entry_join_sf() + get_qi_pivot_join_sf() + get_delivery_note_join() + get_bin_join()
 
     query1 = """
         SELECT
@@ -900,7 +940,7 @@ def get_data(filters):
             soi.rate                                            AS rate_per_piece,
             soi.amount                                          AS total_cost,
             NULL                                                AS dwg_available,
-            NULL                                                AS finish_stock_qty,
+            bin.actual_qty                                      AS finish_stock_qty,
             NULL                                                AS quality_accepted_qty,
             NULL                                                AS finish_stock_rejected_qty,
             NULL                                                AS moulding_qty,
@@ -959,12 +999,29 @@ def get_data(filters):
         LEFT JOIN `tabWork Order` wo
             ON  wo.production_plan      = ppi.parent
             AND wo.production_plan_item = ppi.name
-        LEFT JOIN `tabProduction Plan Sub Assembly Item` ppsa
-            ON ppsa.production_plan_item = ppi.name
-        LEFT JOIN `tabWork Order` wo2
-            ON  wo2.production_plan                   = ppi.parent
-            AND wo2.production_plan_sub_assembly_item = ppsa.name
-            AND wo2.docstatus != 2
+        LEFT JOIN (
+            SELECT
+                production_plan_item,
+                MAX(name) AS name,
+                MAX(production_item) AS production_item
+            FROM `tabProduction Plan Sub Assembly Item`
+            GROUP BY production_plan_item
+        ) ppsa ON ppsa.production_plan_item = ppi.name
+        LEFT JOIN (
+            SELECT
+                production_plan,
+                production_plan_sub_assembly_item,
+                MAX(name)                              AS name,
+                MAX(custom_moulding_completed_date)     AS custom_moulding_completed_date,
+                MAX(custom_mounlding_press_mc)          AS custom_mounlding_press_mc,
+                MAX(custom_oven_no)                     AS custom_oven_no,
+                MAX(custom_challan_no)                  AS custom_challan_no,
+                MAX(custom_fg_material_receipt_date)    AS custom_fg_material_receipt_date
+            FROM `tabWork Order`
+            WHERE docstatus != 2
+            GROUP BY production_plan, production_plan_sub_assembly_item
+        ) wo2 ON wo2.production_plan                   = ppi.parent
+             AND wo2.production_plan_sub_assembly_item = ppsa.name
         {process_joins}
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
@@ -992,6 +1049,17 @@ def get_data(filters):
     data = frappe.db.sql(full_sql, values, as_dict=1)
 
     for row in data:
-        row["moulding_qty"] = (row.get("finish_stock_qty") or 0) - (row.get("order_qty") or 0)
+        row["moulding_qty"] = (row.get("order_qty") or 0) - (row.get("finish_stock_qty") or 0)
 
-    return data
+    seen_work_orders = set()
+    deduped_data = []
+    for row in data:
+        wo_id = row.get("work_order_id")
+        if wo_id:
+            if wo_id not in seen_work_orders:
+                seen_work_orders.add(wo_id)
+                deduped_data.append(row)
+        else:
+            deduped_data.append(row)
+
+    return deduped_data
