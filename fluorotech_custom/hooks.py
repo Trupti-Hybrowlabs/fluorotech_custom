@@ -151,6 +151,10 @@ doc_events = {
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+override_doctype_class = {
+	"Job Card": "fluorotech_custom.config.py.override.CustomJobCard"
+}
+
 # Document Events
 # ---------------
 # Hook on document methods and events
