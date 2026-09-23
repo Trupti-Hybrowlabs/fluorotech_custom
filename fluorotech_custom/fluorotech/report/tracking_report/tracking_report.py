@@ -198,6 +198,19 @@ def get_columns():
             "width": 160
         },
         {
+            "label": _("Sales Order"),
+            "fieldname": "sales_order_id",
+            "fieldtype": "Link",
+            "options": "Sales Order",
+            "width": 140
+        },
+        {
+            "label": _("Work Order Status"),
+            "fieldname": "work_order_status",
+            "fieldtype": "Data",
+            "width": 160
+        },
+        {
             "label": _("Moulding Production Plan Date"),
             "fieldname": "moulding_production_plan_date",
             "fieldtype": "Date",
@@ -858,6 +871,7 @@ def get_delivery_note_join():
             SELECT
                 jnc.parent AS wo_name,
                 MAX(dn.custom_invoice_no) AS custom_invoice_no,
+                MAX(jnc.sales_orders) AS sales_order_id,
                 MAX(dn.custom_invoice_date) AS custom_invoice_date,
                 SUM(dni.qty) AS quantity_dispatched,
                 MAX(dn.name) AS dn_name
@@ -981,10 +995,15 @@ def get_data(filters):
             qi_pivot.inspected_by,
             qi_pivot.custom_pdi_no AS pdi_no,
             dn.custom_invoice_no AS invoice_no,
+            dn.sales_order_id AS sales_order_id,
             dn.custom_invoice_date AS invoice_date,
             dn.quantity_dispatched AS quantity_dispatched,
             dn.dn_name AS dn_number,
             NULL AS delivery_rating,
+            CASE 
+                WHEN wo.name IS NOT NULL THEN 'Work Order Created'
+                ELSE 'Work Order Not Created'
+            END AS work_order_status,
             wo.name                                             AS work_order_id
         FROM
             `tabSales Order Item` soi
