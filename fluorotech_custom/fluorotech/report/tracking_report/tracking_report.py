@@ -18,13 +18,20 @@ def get_columns():
     return [
         # ── ORDER / JOB INFO ──────────────────────────────────────────────
         {
+            "label": _("Sales Order"),
+            "fieldname": "sales_order_id",
+            "fieldtype": "Link",
+            "options": "Sales Order",
+            "width": 200
+        },
+        {
             "label": _("Job No"),
             "fieldname": "job_no",
             "fieldtype": "Data",
             "width": 120
         },
         {
-            "label": _("PO Enter Date"),
+            "label": _("SO Enter Date"),
             "fieldname": "po_enter_date",
             "fieldtype": "Date",
             "width": 110
@@ -197,15 +204,9 @@ def get_columns():
             "options": "Work Order",
             "width": 160
         },
+        
         {
-            "label": _("Sales Order"),
-            "fieldname": "sales_order_id",
-            "fieldtype": "Link",
-            "options": "Sales Order",
-            "width": 140
-        },
-        {
-            "label": _("Work Order Status"),
+            "label": _("Status"),
             "fieldname": "work_order_status",
             "fieldtype": "Data",
             "width": 160
@@ -995,14 +996,15 @@ def get_data(filters):
             qi_pivot.inspected_by,
             qi_pivot.custom_pdi_no AS pdi_no,
             dn.custom_invoice_no AS invoice_no,
-            dn.sales_order_id AS sales_order_id,
+            soi.parent AS sales_order_id,
             dn.custom_invoice_date AS invoice_date,
             dn.quantity_dispatched AS quantity_dispatched,
             dn.dn_name AS dn_number,
             NULL AS delivery_rating,
             CASE 
                 WHEN wo.name IS NOT NULL THEN 'Work Order Created'
-                ELSE 'Work Order Not Created'
+                WHEN ppi.parent IS NOT NULL THEN 'Work Order Not Created'
+                ELSE 'Production Plan Not Created'
             END AS work_order_status,
             wo.name                                             AS work_order_id
         FROM
@@ -1018,6 +1020,7 @@ def get_data(filters):
         LEFT JOIN `tabWork Order` wo
             ON  wo.production_plan      = ppi.parent
             AND wo.production_plan_item = ppi.name
+            AND wo.docstatus != 2
         LEFT JOIN (
             SELECT
                 production_plan_item,
@@ -1045,7 +1048,6 @@ def get_data(filters):
         LEFT JOIN `tabProduction Plan` pp ON pp.name = ppi.parent
         WHERE
             so.docstatus = 1
-            AND wo.docstatus != 2
             {conditions}
     """.format(
         sint_select=sint_select,
@@ -1070,15 +1072,16 @@ def get_data(filters):
     for row in data:
         row["moulding_qty"] = abs((row.get("finish_stock_qty") or 0) - (row.get("order_qty") or 0))
 
-    seen_work_orders = set()
+    seen = set()
     deduped_data = []
     for row in data:
         wo_id = row.get("work_order_id")
         if wo_id:
-            if wo_id not in seen_work_orders:
-                seen_work_orders.add(wo_id)
-                deduped_data.append(row)
+            key = ("WO", wo_id)
         else:
+            key = ("SO", row.get("sales_order_id"), row.get("job_no"), row.get("cic_item_code"), row.get("pos_no"), row.get("order_qty"))
+        if key not in seen:
+            seen.add(key)
             deduped_data.append(row)
 
     return deduped_data
