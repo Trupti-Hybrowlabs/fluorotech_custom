@@ -1,30 +1,52 @@
 {
  "actions": [],
- "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:cycle_no",
- "creation": "2026-02-06 11:15:51.667073",
+ "autoname": "SIN-.YYYY.-.#####",
+ "creation": "2026-09-24 11:55:11.123256",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "sintering",
+  "sintering_data",
+  "work_order",
   "cycle_no"
  ],
  "fields": [
   {
+   "fieldname": "sintering",
+   "fieldtype": "HTML",
+   "label": "Sintering"
+  },
+  {
+   "fieldname": "sintering_data",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Sintering Data"
+  },
+  {
+   "fieldname": "work_order",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Work Order",
+   "options": "Work Order"
+  },
+  {
+   "fetch_from": "work_order.custom_cycle_no",
    "fieldname": "cycle_no",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
+   "hidden": 1,
    "label": "Cycle No",
-   "unique": 1
+   "options": "Cycle No"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-24 14:49:43.091137",
+ "modified": "2026-09-24 15:57:11.147763",
  "modified_by": "Administrator",
  "module": "Fluorotech",
- "name": "Cycle No",
- "naming_rule": "By fieldname",
+ "name": "Sintering",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
