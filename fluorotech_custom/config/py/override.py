@@ -64,3 +64,15 @@ class CustomJobCard(ERPNextJobCard):
                     bold(self.for_quantity),
                 )
             )
+
+
+import frappe
+from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
+
+class CustomStockEntry(StockEntry):
+    def validate_raw_materials_exists(self):
+        if self.purpose == "Manufacture" and self.work_order:
+            item = frappe.db.get_value("Work Order", self.work_order, "production_item")
+            if item and item.startswith("CIC"):
+                return   
+        super().validate_raw_materials_exists()
