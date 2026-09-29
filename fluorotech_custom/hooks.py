@@ -153,7 +153,8 @@ doc_events = {
 
 override_doctype_class = {
 	"Job Card": "fluorotech_custom.config.py.override.CustomJobCard",
-    "Stock Entry": "fluorotech_custom.config.py.override.CustomStockEntry"
+    "Stock Entry": "fluorotech_custom.config.py.override.CustomStockEntry",
+    "Production Plan": "fluorotech_custom.config.py.override.CustomProductionPlan"
 }
 
 # Document Events

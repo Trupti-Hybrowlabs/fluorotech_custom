@@ -66,7 +66,6 @@ class CustomJobCard(ERPNextJobCard):
             )
 
 
-import frappe
 from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 
 class CustomStockEntry(StockEntry):
@@ -76,3 +75,12 @@ class CustomStockEntry(StockEntry):
             if item and item.startswith("CIC"):
                 return   
         super().validate_raw_materials_exists()
+
+
+from frappe import _
+from erpnext.manufacturing.doctype.production_plan.production_plan import ProductionPlan, sales_order_query
+
+class CustomProductionPlan(ProductionPlan):
+    @frappe.whitelist()
+    def validate_sales_orders(self, sales_order=None):
+        pass
