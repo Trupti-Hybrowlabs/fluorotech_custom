@@ -208,6 +208,61 @@ frappe.ui.form.on("Work Order", {
     // before_save: function(frm) {
     //     fetch_fifo_batches_for_all_items(frm);
     // }
+
+    before_submit: function(frm) {
+        if (frm.doc.custom_series !== 'SF.####') return;
+        let checks = (frm.doc.required_items || [])
+            .filter(row => row.item_code && row.source_warehouse)
+            .map(row => {
+                let required_qty = flt(frm.doc.custom_total_mold_weight || row.required_qty);
+                if (required_qty <= 0) return Promise.resolve(null);
+
+                return Promise.resolve(
+                    frappe.call({
+                        method: 'erpnext.stock.doctype.batch.batch.get_batch_qty',
+                        args: {
+                            item_code: row.item_code,
+                            warehouse: row.source_warehouse,
+                            posting_date: frappe.datetime.get_today(),
+                            posting_time: frappe.datetime.now_time()
+                        }
+                    })
+                ).then(r => {
+                    let available = (r.message || [])
+                        .filter(b => flt(b.qty) > 0)
+                        .reduce((sum, b) => sum + flt(b.qty), 0);
+
+                    if (available + 0.0005 < required_qty) {
+                        return {
+                            item_code: row.item_code,
+                            required: required_qty,
+                            available: flt(available, 3),
+                            shortage: flt(required_qty - available, 3)
+                        };
+                    }
+                    return null;
+                });
+            });
+
+        return Promise.all(checks).then(results => {
+            let errors = results.filter(Boolean);
+
+            if (errors.length) {
+                frappe.validated = false;
+                frappe.msgprint({
+                    title: __('Work Order cannot be submitted'),
+                    indicator: 'red',
+                    message: __('Batch quantity is less than the required quantity:') + '<br><br>' +
+                        errors.map(e =>
+                            `<b>${e.item_code}</b>: Required <b>${e.required}</b>, ` +
+                            `only <b>${e.available}</b> available in batches ` +
+                            `(Shortage: <b>${e.shortage}</b>)`
+                        ).join('<br>')
+                });
+            }
+        });
+    },
+
     custom_series: function(frm) {
         frm.clear_table('custom_process_tracking');
         set_processes(frm);
@@ -428,7 +483,11 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
             posting_time: frappe.datetime.now_time()
         },
         callback: function(r) {
-            if (!r.message || r.message.length === 0) return;
+            if (!r.message || r.message.length === 0) {
+                row._batch_shortage = required_qty;
+                row._batch_available = 0;
+                return;
+            }
 
             let batches = r.message
                 .filter(b => b.qty > 0)
@@ -447,6 +506,9 @@ function fetch_fifo_batches_for_single_row(frm, row, cdt = null, cdn = null) {
                 });
                 remaining_qty -= qty_to_take;
             }
+
+            row._batch_shortage = remaining_qty > 0 ? parseFloat(remaining_qty.toFixed(3)) : 0;
+            row._batch_available = parseFloat((required_qty - remaining_qty).toFixed(3));
 
             if (batch_data.length === 0) return;
 
