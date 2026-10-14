@@ -25,6 +25,8 @@ frappe.ui.form.on("Work Order", {
         frm.is_new() && set_processes(frm);
         frm.is_new() && set_cic_processes(frm);
         set_warehouse_filters(frm);
+        render_operation_ui(frm);  
+        add_open_qi_button(frm); 
     },
     onload: function(frm) { frm.is_new() && set_processes(frm); frm.is_new() && set_cic_processes(frm); },
     
@@ -751,5 +753,290 @@ function render_wo_qr_html(frm, qr_data) {
 function show_wo_qr_empty_state(frm) {
     frm.fields_dict.custom_production_qr_code.$wrapper.html(
         `<p class="text-muted">QR Code will be generated after the Work Order is saved.</p>`
+    );
+}
+
+
+// HTML OPERATIONS 
+
+let noOfOperationsCache = null;
+
+function render_operation_ui(frm) {
+    const wrapper = frm.fields_dict.custom_operation_type.$wrapper;
+    wrapper.html('<div style="font-family:monospace;font-size:12px;color:#888;padding:8px 0;">Loading operation types...</div>');
+
+    frappe.db.get_list('No of Operations', {
+        fields: ['name', 'type', 'description'],
+        limit_page_length: 0,
+        limit: 100000
+    }).then((records) => {
+        noOfOperationsCache = {};
+        (records || []).forEach(rec => {
+            noOfOperationsCache[rec.type] = {
+                description: rec.description || ''
+            };
+        });
+        build_ui(frm);
+    });
+}
+
+function build_ui(frm) {
+    const wrapper = frm.fields_dict.custom_operation_type.$wrapper;
+
+    let typeKeys = noOfOperationsCache ? Object.keys(noOfOperationsCache) : [];
+
+    let typeList = typeKeys.map(t => {
+        const rec = noOfOperationsCache[t];
+        const label = rec.description ? `${t} - ${rec.description}` : t;
+        return { label: label, value: t };
+    });
+
+    let html = `
+        <div class="wo-type-row" style="margin-bottom:14px;">
+            <input type="text" class="wo-type-select form-control" placeholder="-- Select Type --" style="width:280px;font-family:monospace;font-size:12px;" autocomplete="off">
+        </div>
+
+        <div class="wo-table-holder"></div>
+    `;
+
+    wrapper.html(html);
+
+    const inputEl = wrapper.find('.wo-type-select')[0];
+
+    const awesomplete = new Awesomplete(inputEl, {
+        list: typeList.map(item => item.label),
+        minChars: 0,
+        autoFirst: true,
+        maxItems: typeList.length || 100,
+        sort: false
+    });
+
+    wrapper.data('typeList', typeList);
+
+    inputEl.addEventListener('awesomplete-selectcomplete', function(e){
+        const selectedLabel = e.text.value;
+        const match = typeList.find(item => item.label === selectedLabel);
+        if (match) select_type(frm, match.value);
+    });
+
+    inputEl.addEventListener('focus', function(){
+        awesomplete.evaluate();
+    });
+
+    if (frm.doc.custom_type) {
+        highlight_active_type(frm);
+        render_table(frm);
+    }
+}
+
+function select_type(frm, typeKey) {
+    frappe.db.get_doc('No of Operations', typeKey).then((doc) => {
+        const opRows = (doc.operations || []).slice().sort((a, b) => {
+            return (a.operation_no || 0) - (b.operation_no || 0);
+        });
+
+        if (!opRows.length) {
+            frappe.msgprint(`No operations defined in the "Operations" table for Type "${typeKey}".`);
+            return;
+        }
+
+        frm.set_value('custom_type', typeKey).then(() => {
+            frm.set_value('custom_family_description', doc.description);
+
+            frm.clear_table('custom_operation_description_detail');
+            opRows.forEach(op => {
+                let row = frm.add_child('custom_operation_description_detail');
+                row.op_no = `Op no - ${op.operation_no}`;
+                row.description = op.description || '';
+                row.value = '';
+            });
+            frm.refresh_field('custom_operation_description_detail');
+
+            highlight_active_type(frm);
+            render_table(frm);
+        });
+    });
+}
+
+function highlight_active_type(frm) {
+    const wrapper = frm.fields_dict.custom_operation_type.$wrapper;
+    const typeList = wrapper.data('typeList') || [];
+    const match = typeList.find(item => item.value === frm.doc.custom_type);
+    wrapper.find('.wo-type-select').val(match ? match.label : frm.doc.custom_type);
+}
+
+function render_table(frm) {
+    const wrapper = frm.fields_dict.custom_operation_type.$wrapper;
+    const rows = frm.doc.custom_operation_description_detail || [];
+
+    if (!rows.length) {
+        wrapper.find('.wo-table-holder').html('<div style="padding:20px;text-align:center;color:#888;font-family:monospace;font-size:12px;">No operations available.</div>');
+        return;
+    }
+
+    let headCells = rows.map(r => `
+        <th style="background:#e4e8e0;padding:8px 12px;border:1px solid #ccc;font-family:monospace;font-size:12px;text-align:left;white-space:nowrap;">
+            ${r.op_no || ''}
+        </th>
+    `).join('');
+
+    let descCells = rows.map(r => `
+        <td style="padding:10px 12px;border:1px solid #ccc;font-size:13px;white-space:pre-line;vertical-align:top;">
+            ${r.description || ''}
+        </td>
+    `).join('');
+
+    let tableHtml = `
+        <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>${headCells}</tr></thead>
+            <tbody>
+                <tr>${descCells}</tr>
+            </tbody>
+        </table>
+    `;
+
+    wrapper.find('.wo-table-holder').html(tableHtml);
+}
+
+
+function add_open_qi_button(frm) {
+    if (frm.doc.custom_series !== 'CIC.####' || !frm.doc.production_plan) return;
+
+    frm.add_custom_button(__('Open Quality Inspection'), () => {
+        frappe.call({
+            method: 'frappe.client.get_list',
+            args: {
+                doctype: 'Work Order',
+                filters: { production_plan: frm.doc.production_plan, custom_series: 'SF.####', docstatus: 1 },
+                fields: ['name'],
+                limit_page_length: 1
+            }
+        }).then(r => {
+            if (!r.message.length) return frappe.msgprint(__('SF Work Order not found.'));
+            let sf_wo = r.message[0].name;
+
+            frappe.call({
+                method: 'frappe.client.get_list',
+                args: {
+                    doctype: 'Stock Entry',
+                    filters: { work_order: sf_wo, purpose: 'Manufacture', docstatus: 1 },
+                    fields: ['name'],
+                    limit_page_length: 0
+                }
+            }).then(r2 => {
+                if (!r2.message.length) return frappe.msgprint(__('No Manufacture Stock Entry found.'));
+                let se_names = r2.message.map(se => se.name);
+
+                frappe.call({
+                    method: 'frappe.client.get_list',
+                    args: {
+                        doctype: 'Quality Inspection',
+                        filters: { reference_type: 'Stock Entry', reference_name: ['in', se_names], docstatus: 1 },
+                        fields: ['name', 'reference_name', 'report_date'],
+                        order_by: 'creation desc',
+                        limit_page_length: 0
+                    }
+                }).then(r3 => {
+                    if (!r3.message.length) return frappe.msgprint(__('No submitted Quality Inspection found.'));
+                    show_qi_list(r3.message);
+                });
+            });
+        });
+    });
+}
+
+function show_qi_list(qi_list) {
+    let rows = qi_list.map(qi => `
+        <tr>
+            <td><a href="#" class="qi-link" data-qi="${qi.name}">${qi.name}</a></td>
+            <td>${qi.reference_name || ''}</td>
+            <td>${qi.report_date || ''}</td>
+        </tr>`).join('');
+
+    let dialog = new frappe.ui.Dialog({
+        title: __('Quality Inspections'),
+        size: 'large',
+        fields: [{
+            fieldname: 'html',
+            fieldtype: 'HTML',
+            options: `
+                <table class="table table-bordered">
+                    <thead>
+                        <tr><th>${__('Quality Inspection')}</th><th>${__('Stock Entry')}</th><th>${__('Date')}</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>`
+        }],
+        primary_action_label: __('Rework'),
+        primary_action: () => {
+            rework_cancel(qi_list, dialog);
+        }
+    });
+    dialog.show();
+    dialog.$wrapper.find('.qi-link').on('click', function(e) {
+        e.preventDefault();
+        show_qi_details($(this).data('qi'));
+    });
+}
+
+function show_qi_details(qi_name) {
+    frappe.call({
+        method: 'frappe.client.get',
+        args: { doctype: 'Quality Inspection', name: qi_name }
+    }).then(res => {
+        let qi = res.message;
+        let params = qi.custom_parameters || [];
+        let rows = params.length
+            ? params.map(p => `<tr><td>${p.parameter || ''}</td><td>${p.value || ''}</td></tr>`).join('')
+            : `<tr><td colspan="2" class="text-muted text-center">${__('No parameters found')}</td></tr>`;
+
+        new frappe.ui.Dialog({
+            title: __('Quality Inspection Details') + ' - ' + qi.name,
+            size: 'large',
+            fields: [{
+                fieldname: 'html',
+                fieldtype: 'HTML',
+                options: `
+                    <div style="margin-bottom: 15px;">
+                        <label class="text-muted">${__('Quality Inspection Template')}</label>
+                        <div>${qi.custom_quality_template || ''}</div>
+                    </div>
+                    <label class="text-muted">${__('Parameters')}</label>
+                    <table class="table table-bordered">
+                        <thead><tr><th>${__('Parameter')}</th><th>${__('Value')}</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>`
+            }]
+        }).show();
+    });
+}
+
+function rework_cancel(qi_list, dialog) {
+    frappe.confirm(
+        __('Are you sure you want to cancel these Quality Inspections and their Stock Entries?'),
+        () => {
+            let qi_names = qi_list.map(q => q.name);
+            let se_names = [...new Set(qi_list.map(q => q.reference_name))];
+
+            let cancel_qi = qi_names.reduce((p, name) => p.then(() =>
+                frappe.call({
+                    method: 'frappe.client.cancel',
+                    args: { doctype: 'Quality Inspection', name: name }
+                })
+            ), Promise.resolve());
+
+            cancel_qi.then(() =>
+                se_names.reduce((p, name) => p.then(() =>
+                    frappe.call({
+                        method: 'frappe.client.cancel',
+                        args: { doctype: 'Stock Entry', name: name }
+                    })
+                ), Promise.resolve())
+            ).then(() => {
+                dialog.hide();
+                frappe.show_alert({ message: __('Rework done. Entries cancelled.'), indicator: 'green' });
+                cur_frm.reload_doc();
+            });
+        }
     );
 }

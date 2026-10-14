@@ -56,7 +56,8 @@ doctype_js = {
     "Sales Order": "public/js/sales_order.js",
     "Production Plan": "public/js/production_plan.js",
     "Stock Entry": "public/js/stock_entry.js",
-    "Quality Inspection": "public/js/quality_inspection.js"
+    "Quality Inspection": "public/js/quality_inspection.js",
+    "Job Card": "public/js/job_card.js"
 }
 
 

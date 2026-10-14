@@ -936,6 +936,7 @@ def get_data(filters):
 
     query1 = """
         SELECT
+            soi.name                                            AS soi_name,
             soi.custom_job_number                               AS job_no,
             soi.custom_pos_no                                   AS pos_no,
             so.transaction_date                                 AS po_enter_date,
@@ -1077,9 +1078,9 @@ def get_data(filters):
     for row in data:
         wo_id = row.get("work_order_id")
         if wo_id:
-            key = ("WO", wo_id)
+            key = ("WO", wo_id, row.get("soi_name"))
         else:
-            key = ("SO", row.get("sales_order_id"), row.get("job_no"), row.get("cic_item_code"), row.get("pos_no"), row.get("order_qty"))
+            key = ("SO", row.get("soi_name"))
         if key not in seen:
             seen.add(key)
             deduped_data.append(row)
