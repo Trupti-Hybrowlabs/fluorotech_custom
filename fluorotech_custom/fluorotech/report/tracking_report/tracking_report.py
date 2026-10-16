@@ -904,7 +904,7 @@ def get_data(filters):
         values["customer"] = filters["customer"]
 
     if filters.get("item_code"):
-        conditions += " AND (ppi.item_code = %(item_code)s OR ppsa.production_item = %(item_code)s)"
+        conditions += " AND (soi.item_code = %(item_code)s OR REPLACE(soi.item_code, 'CIC', 'SF') = %(item_code)s)"
         values["item_code"] = filters["item_code"]
 
     if filters.get("dev_or_production"):
@@ -942,8 +942,8 @@ def get_data(filters):
             so.transaction_date                                 AS po_enter_date,
             soi.custom_type                                     AS dev_or_production,
             so.customer                                         AS customer,
-            ppi.item_code                                       AS cic_item_code,
-            ppsa.production_item                                AS sf_item_code,
+            soi.item_code                                       AS cic_item_code,
+            REPLACE(soi.item_code, 'CIC', 'SF')                 AS sf_item_code,
             soi.qty                                             AS order_qty,
             so.po_no                                            AS po_no,
             so.po_date                                          AS po_date,
