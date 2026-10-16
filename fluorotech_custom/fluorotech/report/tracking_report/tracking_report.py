@@ -842,7 +842,7 @@ def get_stock_entry_join_sf():
 def get_bin_join():
     return """
         LEFT JOIN `tabBin` bin
-            ON bin.item_code = ppi.item_code
+            ON bin.item_code = soi.item_code
             AND bin.warehouse = %(finish_warehouse)s
     """
 
@@ -1017,6 +1017,10 @@ def get_data(filters):
             AND (
                 ppi.sales_order = soi.parent
                 OR ppi.parent = ppr.parent
+            )
+            AND (
+                ppi.custom_job_number = soi.custom_job_number
+                OR IFNULL(ppi.custom_job_number, '') = ''
             )
         LEFT JOIN `tabWork Order` wo
             ON  wo.production_plan      = ppi.parent
