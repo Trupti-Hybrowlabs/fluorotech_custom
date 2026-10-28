@@ -116,20 +116,25 @@ frappe.ui.form.on('Quality Inspection', {
     }
 });
 
-
 function set_reference_fields(frm) {
     if (frm.doc.reference_type === "Purchase Receipt" && frm.doc.reference_name) {
 
         frappe.db.get_doc("Purchase Receipt", frm.doc.reference_name).then((doc) => {
 
-            if (doc.supplier_name) {
-                frm.set_value("custom_supplier_name", doc.supplier_name);
-            }
+            const set_if_changed = (field, value) => {
+                if (value === undefined || value === null || value === "") return;
+                if (String(frm.doc[field] || "") !== String(value)) {
+                    frm.set_value(field, value);
+                }
+            };
+
+            set_if_changed("custom_supplier_name", doc.supplier_name);
 
             if (frm.doc.child_row_reference && doc.items) {
                 let row = doc.items.find(i => i.name === frm.doc.child_row_reference);
-                if (row && row.purchase_order) {
-                    frm.set_value("custom_purchase_order", row.purchase_order);
+                if (row) {
+                    set_if_changed("custom_purchase_order", row.purchase_order);
+                    set_if_changed("custom_quantity", row.custom_inwarded_qty);
                 }
             }
 
