@@ -37,76 +37,48 @@ frappe.ui.form.on('Quality Inspection', {
         if (frm.doc.docstatus === 2 && frm.doc.custom_work_order) {
 
             frm.add_custom_button(__('Rework'), function() {
-
-                frappe.confirm(
-                    __('This will cancel the Manufacture and Material Transfer Stock Entries for Work Order {0}. Are you sure?', [frm.doc.custom_work_order]),
-                    function() {
-                        frappe.call({
-                            method: 'frappe.client.set_value',
-                            args: {
-                                doctype: 'Work Order',
-                                name: frm.doc.custom_work_order,
-                                fieldname: 'custom_machining_completed',
-                                value: 0
-                            },
-                            callback: function() {
+                let d = new frappe.ui.Dialog({
+                    title: __('Rework'),
+                    fields: [{
+                        fieldname: 'rework_qty',
+                        fieldtype: 'Float',
+                        label: __('Rework Qty'),
+                        reqd: 1,
+                        default: frm.doc.custom_rework_qty || 0
+                    }],
+                    primary_action_label: __('Submit'),
+                    primary_action: function(values) {
+                        if (flt(values.rework_qty) <= 0) {
+                            frappe.msgprint(__('Rework Qty must be greater than 0'));
+                            return;
+                        }
+                        frappe.confirm(
+                            __('The Manufacture Stock Entry will be cancelled and recreated with {0} qty less. Continue?', [values.rework_qty]),
+                            function() {
                                 frappe.call({
-                                    method: 'frappe.client.get_list',
+                                    method: 'fluorotech_custom.config.py.work_order.rework_manufacture_entry',
                                     args: {
-                                        doctype: 'Stock Entry',
-                                        filters: {
-                                            work_order: frm.doc.custom_work_order,
-                                            docstatus: 1,
-                                            purpose: ['in', ['Manufacture', 'Material Transfer for Manufacture']]
-                                        },
-                                        fields: ['name', 'purpose']
+                                        quality_inspection: frm.doc.name,
+                                        work_order: frm.doc.custom_work_order,
+                                        rework_qty: values.rework_qty
                                     },
+                                    freeze: true,
                                     callback: function(r) {
-                                        let entries = r.message || [];
-
-                                        if (!entries.length) {
-                                            frappe.msgprint(__('No submitted Stock Entries found for this Work Order.'));
-                                            frm.reload_doc();
-                                            return;
-                                        }
-
-                                        entries.sort((a, b) => (a.purpose === 'Manufacture' ? -1 : 1));
-
-                                        let cancel_one = function(i) {
-                                            if (i >= entries.length) {
-                                                frappe.show_alert({
-                                                    message: __('Stock Entries cancelled and Work Order updated.'),
-                                                    indicator: 'green'
-                                                });
-                                                frm.reload_doc();
-                                                return;
-                                            }
-                                            frappe.call({
-                                                method: 'frappe.client.cancel',
-                                                args: {
-                                                    doctype: 'Stock Entry',
-                                                    name: entries[i].name
-                                                },
-                                                callback: function() {
-                                                    cancel_one(i + 1);
-                                                },
-                                                error: function() {
-                                                    frappe.msgprint(__('Error cancelling {0}.', [entries[i].name]));
-                                                }
+                                        if (r.message) {
+                                            d.hide();
+                                            frappe.show_alert({
+                                                message: __('New Stock Entry {0} created and submitted', [r.message]),
+                                                indicator: 'green'
                                             });
-                                        };
-
-                                        cancel_one(0);
+                                            frm.reload_doc();
+                                        }
                                     }
                                 });
-                            },
-                            error: function() {
-                                frappe.msgprint(__('Failed to update Work Order flag. Aborting.'));
                             }
-                        });
+                        );
                     }
-                );
-
+                });
+                d.show();
             }, __('Actions')).addClass('btn-danger');
         }
 

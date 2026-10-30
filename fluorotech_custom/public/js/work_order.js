@@ -272,12 +272,12 @@ frappe.ui.form.on("Work Order", {
         frm.clear_table('custom_process');
         set_cic_processes(frm);   
     },
-    custom_enable_process_tracking: function(frm) {
-        (frm.doc.custom_process_tracking || []).forEach(row =>
-            frappe.model.set_value(row.doctype, row.name, 'completed', frm.doc.custom_enable_process_tracking ? 1 : 0)
-        );
-        frm.refresh_field('custom_process_tracking');
-    },
+    // custom_enable_process_tracking: function(frm) {
+    //     (frm.doc.custom_process_tracking || []).forEach(row =>
+    //         frappe.model.set_value(row.doctype, row.name, 'completed', frm.doc.custom_enable_process_tracking ? 1 : 0)
+    //     );
+    //     frm.refresh_field('custom_process_tracking');
+    // },
     custom_enable_process: function(frm) {
         if (frm.doc.custom_enable_process) {
             set_cic_processes(frm);
@@ -554,7 +554,7 @@ function set_processes(frm) {
         .forEach(p => {
             let row = frm.add_child('custom_process_tracking');
             row.process_ct = p;
-            row.completed = frm.doc.custom_enable_process_tracking ? 1 : 0;
+            // row.completed = frm.doc.custom_enable_process_tracking ? 1 : 0;
         });
 
     frm.refresh_field('custom_process_tracking');
@@ -919,38 +919,25 @@ function add_open_qi_button(frm) {
                 method: 'frappe.client.get_list',
                 args: {
                     doctype: 'Stock Entry',
-                    filters: { work_order: sf_wo, purpose: 'Manufacture', docstatus: 1 },
-                    fields: ['name'],
+                    filters: { work_order: sf_wo, stock_entry_type: 'Manufacture', docstatus: 1 },
+                    fields: ['name', 'posting_date', 'custom_quality_inspection_template'],
+                    order_by: 'creation desc',
                     limit_page_length: 0
                 }
             }).then(r2 => {
                 if (!r2.message.length) return frappe.msgprint(__('No Manufacture Stock Entry found.'));
-                let se_names = r2.message.map(se => se.name);
-
-                frappe.call({
-                    method: 'frappe.client.get_list',
-                    args: {
-                        doctype: 'Quality Inspection',
-                        filters: { reference_type: 'Stock Entry', reference_name: ['in', se_names], docstatus: 1 },
-                        fields: ['name', 'reference_name', 'report_date'],
-                        order_by: 'creation desc',
-                        limit_page_length: 0
-                    }
-                }).then(r3 => {
-                    if (!r3.message.length) return frappe.msgprint(__('No submitted Quality Inspection found.'));
-                    show_qi_list(r3.message);
-                });
+                show_qi_list(r2.message);
             });
         });
     });
 }
 
-function show_qi_list(qi_list) {
-    let rows = qi_list.map(qi => `
+function show_qi_list(se_list) {
+    let rows = se_list.map(se => `
         <tr>
-            <td><a href="#" class="qi-link" data-qi="${qi.name}">${qi.name}</a></td>
-            <td>${qi.reference_name || ''}</td>
-            <td>${qi.report_date || ''}</td>
+            <td><a href="#" class="qi-link" data-se="${se.name}">${se.name}</a></td>
+            <td>${se.custom_quality_inspection_template || ''}</td>
+            <td>${se.posting_date || ''}</td>
         </tr>`).join('');
 
     let dialog = new frappe.ui.Dialog({
@@ -962,36 +949,36 @@ function show_qi_list(qi_list) {
             options: `
                 <table class="table table-bordered">
                     <thead>
-                        <tr><th>${__('Quality Inspection')}</th><th>${__('Stock Entry')}</th><th>${__('Date')}</th></tr>
+                        <tr><th>${__('Stock Entry')}</th><th>${__('Quality Inspection Template')}</th><th>${__('Date')}</th></tr>
                     </thead>
                     <tbody>${rows}</tbody>
                 </table>`
         }],
         primary_action_label: __('Rework'),
         primary_action: () => {
-            rework_cancel(qi_list, dialog);
+            rework_cancel(se_list, dialog);
         }
     });
     dialog.show();
     dialog.$wrapper.find('.qi-link').on('click', function(e) {
         e.preventDefault();
-        show_qi_details($(this).data('qi'));
+        show_qi_details($(this).data('se'));
     });
 }
 
-function show_qi_details(qi_name) {
+function show_qi_details(se_name) {
     frappe.call({
         method: 'frappe.client.get',
-        args: { doctype: 'Quality Inspection', name: qi_name }
+        args: { doctype: 'Stock Entry', name: se_name }
     }).then(res => {
-        let qi = res.message;
-        let params = qi.custom_parameters || [];
+        let se = res.message;
+        let params = se.custom_parameters || [];
         let rows = params.length
             ? params.map(p => `<tr><td>${p.parameter || ''}</td><td>${p.value || ''}</td></tr>`).join('')
             : `<tr><td colspan="2" class="text-muted text-center">${__('No parameters found')}</td></tr>`;
 
         new frappe.ui.Dialog({
-            title: __('Quality Inspection Details') + ' - ' + qi.name,
+            title: __('Quality Inspection Details') + ' - ' + se.name,
             size: 'large',
             fields: [{
                 fieldname: 'html',
@@ -999,7 +986,7 @@ function show_qi_details(qi_name) {
                 options: `
                     <div style="margin-bottom: 15px;">
                         <label class="text-muted">${__('Quality Inspection Template')}</label>
-                        <div>${qi.custom_quality_template || ''}</div>
+                        <div>${se.custom_quality_inspection_template || ''}</div>
                     </div>
                     <label class="text-muted">${__('Parameters')}</label>
                     <table class="table table-bordered">
@@ -1011,28 +998,18 @@ function show_qi_details(qi_name) {
     });
 }
 
-function rework_cancel(qi_list, dialog) {
+function rework_cancel(se_list, dialog) {
     frappe.confirm(
-        __('Are you sure you want to cancel these Quality Inspections and their Stock Entries?'),
+        __('Are you sure you want to cancel these Stock Entries?'),
         () => {
-            let qi_names = qi_list.map(q => q.name);
-            let se_names = [...new Set(qi_list.map(q => q.reference_name))];
+            let se_names = se_list.map(se => se.name);
 
-            let cancel_qi = qi_names.reduce((p, name) => p.then(() =>
+            se_names.reduce((p, name) => p.then(() =>
                 frappe.call({
                     method: 'frappe.client.cancel',
-                    args: { doctype: 'Quality Inspection', name: name }
+                    args: { doctype: 'Stock Entry', name: name }
                 })
-            ), Promise.resolve());
-
-            cancel_qi.then(() =>
-                se_names.reduce((p, name) => p.then(() =>
-                    frappe.call({
-                        method: 'frappe.client.cancel',
-                        args: { doctype: 'Stock Entry', name: name }
-                    })
-                ), Promise.resolve())
-            ).then(() => {
+            ), Promise.resolve()).then(() => {
                 dialog.hide();
                 frappe.show_alert({ message: __('Rework done. Entries cancelled.'), indicator: 'green' });
                 cur_frm.reload_doc();

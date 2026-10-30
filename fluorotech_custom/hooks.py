@@ -61,9 +61,15 @@ doctype_js = {
 }
 
 
+# doc_events = {
+#     "Work Order": {
+#         "before_insert": "fluorotech_custom.config.py.work_order.set_job_numbers"
+#     }
+# }
+
 doc_events = {
     "Work Order": {
-        "before_insert": "fluorotech_custom.config.py.work_order.set_job_numbers"
+        "before_insert": "fluorotech_custom.config.py.work_order.set_job_number_from_pp"
     }
 }
 

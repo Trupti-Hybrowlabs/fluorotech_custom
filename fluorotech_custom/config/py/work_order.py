@@ -64,36 +64,64 @@ def weight(od, id, length, density):
 #     frappe.db.commit()
 
 
-def set_job_numbers(doc, method):
-    if not doc.production_plan:
+# def set_job_numbers(doc, method):
+#     if not doc.production_plan:
+#         return
+
+#     if doc.get('custom_job_number'):
+#         return
+
+#     sales_orders = frappe.db.get_all(
+#         'Production Plan Sales Order',
+#         filters={'parent': doc.production_plan},
+#         fields=['sales_order', 'custom_job_number'],
+#         order_by='idx asc'
+#     )
+
+#     valid_rows = [
+#         row for row in sales_orders
+#         if row.get('sales_order') and row.get('custom_job_number')
+#     ]
+
+#     if not valid_rows:
+#         return
+
+#     for row in valid_rows:
+#         doc.append('custom_job_number', {
+#             'sales_orders': row['sales_order'],
+#             'job_number': row['custom_job_number']
+#         })
+
+#     if doc.get('production_plan_sub_assembly_item') and doc.get('sales_order'):
+#         doc.sales_order = None
+
+def set_job_number_from_pp(doc, method=None):
+    if not doc.get("production_plan_item"):
         return
 
-    if doc.get('custom_job_number'):
+    if doc.get("custom_job_number"):
         return
 
-    sales_orders = frappe.db.get_all(
-        'Production Plan Sales Order',
-        filters={'parent': doc.production_plan},
-        fields=['sales_order', 'custom_job_number'],
-        order_by='idx asc'
+    row = frappe.db.get_value(
+        "Production Plan Item",
+        doc.production_plan_item,
+        ["sales_order", "sales_order_item", "custom_job_number"],
+        as_dict=True,
     )
-
-    valid_rows = [
-        row for row in sales_orders
-        if row.get('sales_order') and row.get('custom_job_number')
-    ]
-
-    if not valid_rows:
+    if not row or not row.sales_order:
         return
 
-    for row in valid_rows:
-        doc.append('custom_job_number', {
-            'sales_orders': row['sales_order'],
-            'job_number': row['custom_job_number']
-        })
+    job_number = row.custom_job_number
 
-    if doc.get('production_plan_sub_assembly_item') and doc.get('sales_order'):
-        doc.sales_order = None
+    if not job_number and row.sales_order_item:
+        job_number = frappe.db.get_value(
+            "Sales Order Item", row.sales_order_item, "custom_job_number"
+        )
+
+    doc.append("custom_job_number", {
+        "sales_orders": row.sales_order,
+        "job_number": job_number or "",
+    })
 
 @frappe.whitelist()
 def generate_work_order_qr_code(work_order_name):
@@ -125,3 +153,45 @@ def generate_work_order_qr_code(work_order_name):
     except Exception as e:
         frappe.log_error(f"Error generating QR code for Work Order {work_order_name}: {str(e)}")
         frappe.throw(f"Failed to generate QR code: {str(e)}")
+
+
+from frappe import _
+from frappe.utils import flt
+
+
+@frappe.whitelist()
+def rework_manufacture_entry(quality_inspection, work_order, rework_qty):
+    rework_qty = flt(rework_qty)
+    if rework_qty <= 0:
+        frappe.throw(_("Rework Qty must be greater than 0"))
+
+    se_name = frappe.db.get_value(
+        "Stock Entry",
+        {"work_order": work_order, "purpose": "Manufacture", "docstatus": 1},
+        "name",
+        order_by="creation desc",
+    )
+    if not se_name:
+        frappe.throw(_("No submitted Manufacture Stock Entry found for {0}").format(work_order))
+
+    old = frappe.get_doc("Stock Entry", se_name)
+    fg_qty = flt(old.fg_completed_qty)
+    if rework_qty >= fg_qty:
+        frappe.throw(_("Rework Qty must be less than Manufactured Qty ({0})").format(fg_qty))
+
+    old.cancel()
+
+    new = frappe.copy_doc(old)
+    new.fg_completed_qty = fg_qty - rework_qty
+    for row in new.items:
+        if row.is_finished_item:
+            row.qty = flt(row.qty) - rework_qty
+            row.transfer_qty = flt(row.qty) * flt(row.conversion_factor or 1)
+            row.quality_inspection = None  
+    new.insert()
+    new.submit()
+
+    frappe.db.set_value("Quality Inspection", quality_inspection, "custom_rework_qty", rework_qty)
+    frappe.db.set_value("Work Order", work_order, "custom_machining_completed", 0)
+
+    return new.name
