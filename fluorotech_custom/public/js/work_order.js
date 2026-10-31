@@ -949,7 +949,7 @@ function show_qi_list(se_list) {
             options: `
                 <table class="table table-bordered">
                     <thead>
-                        <tr><th>${__('Stock Entry')}</th><th>${__('Quality Inspection Template')}</th><th>${__('Date')}</th></tr>
+                        <tr><th>${__('Stock Entry')}</th><th>${__('Quality Stage Inspection')}</th><th>${__('Date')}</th></tr>
                     </thead>
                     <tbody>${rows}</tbody>
                 </table>`
@@ -985,7 +985,7 @@ function show_qi_details(se_name) {
                 fieldtype: 'HTML',
                 options: `
                     <div style="margin-bottom: 15px;">
-                        <label class="text-muted">${__('Quality Inspection Template')}</label>
+                        <label class="text-muted">${__('Quality Stage Inspection')}</label>
                         <div>${se.custom_quality_inspection_template || ''}</div>
                     </div>
                     <label class="text-muted">${__('Parameters')}</label>
@@ -999,21 +999,47 @@ function show_qi_details(se_name) {
 }
 
 function rework_cancel(se_list, dialog) {
-    frappe.confirm(
-        __('Are you sure you want to cancel these Stock Entries?'),
-        () => {
-            let se_names = se_list.map(se => se.name);
-
-            se_names.reduce((p, name) => p.then(() =>
-                frappe.call({
-                    method: 'frappe.client.cancel',
-                    args: { doctype: 'Stock Entry', name: name }
-                })
-            ), Promise.resolve()).then(() => {
-                dialog.hide();
-                frappe.show_alert({ message: __('Rework done. Entries cancelled.'), indicator: 'green' });
-                cur_frm.reload_doc();
-            });
+    let d = new frappe.ui.Dialog({
+        title: __('Rework'),
+        fields: [{
+            fieldname: 'rework_qty',
+            fieldtype: 'Float',
+            label: __('Rework Qty'),
+            reqd: 1,
+            default: cur_frm.doc.custom_rework_qty || 0
+        }],
+        primary_action_label: __('Submit'),
+        primary_action: function(values) {
+            if (flt(values.rework_qty) <= 0) {
+                frappe.msgprint(__('Rework Qty must be greater than 0'));
+                return;
+            }
+            frappe.confirm(
+                __('The Manufacture Stock Entry will be cancelled and recreated with {0} qty less. Continue?', [values.rework_qty]),
+                () => {
+                    frappe.call({
+                        method: 'fluorotech_custom.config.py.work_order.rework_manufacture_entry',
+                        args: {
+                            work_order: cur_frm.doc.name,
+                            rework_qty: values.rework_qty,
+                            stock_entry: se_list[0].name
+                        },
+                        freeze: true,
+                        callback: function(r) {
+                            if (r.message) {
+                                d.hide();
+                                dialog.hide();
+                                frappe.show_alert({
+                                    message: __('New Stock Entry {0} created and submitted', [r.message]),
+                                    indicator: 'green'
+                                });
+                                cur_frm.reload_doc();
+                            }
+                        }
+                    });
+                }
+            );
         }
-    );
+    });
+    d.show();
 }

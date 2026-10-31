@@ -158,19 +158,21 @@ def generate_work_order_qr_code(work_order_name):
 from frappe import _
 from frappe.utils import flt
 
-
 @frappe.whitelist()
-def rework_manufacture_entry(quality_inspection, work_order, rework_qty):
+def rework_manufacture_entry(work_order, rework_qty, quality_inspection=None, stock_entry=None):
     rework_qty = flt(rework_qty)
     if rework_qty <= 0:
         frappe.throw(_("Rework Qty must be greater than 0"))
 
-    se_name = frappe.db.get_value(
-        "Stock Entry",
-        {"work_order": work_order, "purpose": "Manufacture", "docstatus": 1},
-        "name",
-        order_by="creation desc",
-    )
+    if stock_entry:
+        se_name = stock_entry
+    else:
+        se_name = frappe.db.get_value(
+            "Stock Entry",
+            {"work_order": work_order, "purpose": "Manufacture", "docstatus": 1},
+            "name",
+            order_by="creation desc",
+        )
     if not se_name:
         frappe.throw(_("No submitted Manufacture Stock Entry found for {0}").format(work_order))
 
@@ -187,11 +189,15 @@ def rework_manufacture_entry(quality_inspection, work_order, rework_qty):
         if row.is_finished_item:
             row.qty = flt(row.qty) - rework_qty
             row.transfer_qty = flt(row.qty) * flt(row.conversion_factor or 1)
-            row.quality_inspection = None  
+            row.quality_inspection = None
     new.insert()
     new.submit()
 
-    frappe.db.set_value("Quality Inspection", quality_inspection, "custom_rework_qty", rework_qty)
+    if quality_inspection:
+        frappe.db.set_value("Quality Inspection", quality_inspection, "custom_rework_qty", rework_qty)
+    else:
+        frappe.db.set_value("Work Order", work_order, "custom_rework_qty", rework_qty)
+
     frappe.db.set_value("Work Order", work_order, "custom_machining_completed", 0)
 
     return new.name
