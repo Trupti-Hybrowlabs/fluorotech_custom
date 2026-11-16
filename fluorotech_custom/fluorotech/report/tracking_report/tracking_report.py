@@ -69,11 +69,23 @@ def get_columns():
             "width": 160
         },
         {
+            "label": _("CIC Item Name"),
+            "fieldname": "cic_item_name",
+            "fieldtype": "Data",
+            "width": 200
+        },
+        {
             "label": _("SF Item Code"),
             "fieldname": "sf_item_code",
             "fieldtype": "Link",
             "options": "Item",
             "width": 160
+        },
+        {
+            "label": _("SF Item Name"),
+            "fieldname": "sf_item_name",
+            "fieldtype": "Data",
+            "width": 200
         },
         {
             "label": _("Drawing Number"),
@@ -943,7 +955,9 @@ def get_data(filters):
             soi.custom_type                                     AS dev_or_production,
             so.customer                                         AS customer,
             soi.item_code                                       AS cic_item_code,
+            item_cic.item_name                                  AS cic_item_name,   
             REPLACE(soi.item_code, 'CIC', 'SF')                 AS sf_item_code,
+            item_sf.item_name                                   AS sf_item_name,   
             soi.qty                                             AS order_qty,
             so.po_no                                            AS po_no,
             so.po_date                                          AS po_date,
@@ -1011,6 +1025,8 @@ def get_data(filters):
         FROM
             `tabSales Order Item` soi
         INNER JOIN `tabSales Order` so ON so.name = soi.parent
+        LEFT JOIN `tabItem` item_cic ON item_cic.name = soi.item_code
+        LEFT JOIN `tabItem` item_sf  ON item_sf.name  = REPLACE(soi.item_code, 'CIC', 'SF')    
         {ppr_join}
         LEFT JOIN `tabProduction Plan Item` ppi
             ON  ppi.item_code = soi.item_code

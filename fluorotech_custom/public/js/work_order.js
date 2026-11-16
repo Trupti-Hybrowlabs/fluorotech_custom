@@ -1043,3 +1043,136 @@ function rework_cancel(se_list, dialog) {
     });
     d.show();
 }
+
+
+// frappe.ui.form.on("Work Order", {
+//     refresh(frm) {
+//         const $w = $(frm.page.wrapper);
+
+//         // START dialog (Material Transfer for Manufacture)
+//         $w.off("click.startqty").on("click.startqty", ".btn", function () {
+//             if ($(this).text().trim() === __("Start")) {
+//                 set_start_dialog_qty(frm);      // CIC
+//                 set_sf_start_dialog_qty(frm);   // SF
+//             }
+//         });
+
+//         // FINISH dialog (Manufacture)
+//         $w.off("click.deburing").on("click.deburing", ".btn", function () {
+//             if ($(this).text().trim() === __("Finish")) {
+//                 set_finish_dialog_qty(frm);     // CIC
+//                 set_sf_finish_dialog_qty(frm);  // SF
+//             }
+//         });
+//     }
+// });
+
+// // dialog ka qty field milne tak wait karke callback chalata hai
+// function wait_for_dialog_qty(callback) {
+//     let tries = 0;
+//     let timer = setInterval(() => {
+//         tries++;
+//         let d = cur_dialog;
+//         let f = d && d.get_field && d.get_field("qty");
+//         if (f) {
+//             clearInterval(timer);
+//             callback(d, f);
+//         } else if (tries > 15) {
+//             clearInterval(timer);
+//         }
+//     }, 200);
+// }
+
+// // ================= CIC (jaisa tha waisa) =================
+
+// // ---------- START: sub assembly produced qty ----------
+// async function set_start_dialog_qty(frm) {
+//     if (frm.doc.custom_series !== "CIC.####" || !frm.doc.production_plan) return;
+
+//     let sub_qty = 0;
+//     for (const r of (frm.doc.required_items || [])) {
+//         const res = await frappe.call({
+//             method: "frappe.client.get_list",
+//             args: {
+//                 doctype: "Work Order",
+//                 filters: {
+//                     production_plan: frm.doc.production_plan,
+//                     production_item: r.item_code,
+//                     docstatus: 1,
+//                     production_plan_sub_assembly_item: ["is", "set"]
+//                 },
+//                 fields: ["produced_qty"],
+//                 limit_page_length: 100
+//             }
+//         });
+//         let produced = 0;
+//         (res.message || []).forEach(w => produced += flt(w.produced_qty));
+//         if (produced) {
+//             sub_qty = produced;
+//             break;
+//         }
+//     }
+
+//     wait_for_dialog_qty((d, f) => {
+//         if (sub_qty > 0) {
+//             d.set_value("qty", sub_qty);
+//             f.set_description(__("Max: {0}", [sub_qty]));
+//         } else {
+//             f.set_description("");
+//         }
+//     });
+// }
+
+// // ---------- FINISH: Deburing qty ----------
+// function set_finish_dialog_qty(frm) {
+//     if (frm.doc.custom_series !== "CIC.####") return;
+
+//     let row = (frm.doc.custom_process || []).find(
+//         r => r.cic_process_ct === "Deburing"
+//     );
+//     let deburing_qty = row ? flt(row.qty_produced) : 0;
+
+//     wait_for_dialog_qty((d, f) => {
+//         if (deburing_qty > 0) {
+//             d.set_value("qty", deburing_qty);
+//             f.set_description(__("Max: {0}", [deburing_qty]));
+//         } else {
+//             f.set_description("");
+//         }
+//     });
+// }
+
+// // ================= SF =================
+
+// // ---------- SF START: custom_total_mold_weight ----------
+// async function set_sf_start_dialog_qty(frm) {
+//     if (frm.doc.custom_series !== "SF.####") return;
+
+//     const r = await frappe.db.get_value("Work Order", frm.doc.name, "custom_total_mold_weight");
+//     const mold = flt(r.message && r.message.custom_total_mold_weight);
+
+//     wait_for_dialog_qty((d, f) => {
+//         if (mold > 0) {
+//             d.set_value("qty", mold);
+//             f.set_description(__("Max: {0}", [mold]));
+//         } else {
+//             f.set_description("");
+//         }
+//     });
+// }
+
+// // ---------- SF FINISH: Work Order ki qty ----------
+// function set_sf_finish_dialog_qty(frm) {
+//     if (frm.doc.custom_series !== "SF.####") return;
+
+//     const wo_qty = flt(frm.doc.qty);
+
+//     wait_for_dialog_qty((d, f) => {
+//         if (wo_qty > 0) {
+//             d.set_value("qty", wo_qty);
+//             f.set_description(__("Max: {0}", [wo_qty]));
+//         } else {
+//             f.set_description("");
+//         }
+//     });
+// }
