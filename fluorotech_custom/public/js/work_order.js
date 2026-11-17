@@ -213,6 +213,7 @@ frappe.ui.form.on("Work Order", {
 
     before_submit: function(frm) {
         if (frm.doc.custom_series !== 'SF.####') return;
+        if (['Finish Stock Process', 'Stock Bush Process'].includes(frm.doc.custom_sub_work_order_type)) return;
         let checks = (frm.doc.required_items || [])
             .filter(row => row.item_code && row.source_warehouse)
             .map(row => {
