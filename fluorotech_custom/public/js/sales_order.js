@@ -17,22 +17,25 @@ function generate_job_number(frm, cdt, cdn) {
             doctype: 'Sales Order',
             fields: ['`tabSales Order Item`.custom_job_number'],
             filters: [['Sales Order Item', 'custom_job_number', 'like', `${prefix}%`]],
-            order_by: '`tabSales Order Item`.custom_job_number desc',
-            limit_page_length: 1 
+            limit_page_length: 0   
         },
         callback({ message }) {
-            let last_seq = message?.length
-                ? parseInt((message[0].custom_job_number || '').replace(prefix, '')) || 0
-                : 0;
+            let last_seq = 0;
 
-            (frm.doc.items || []).forEach(({ custom_job_number }) => {
-                if (custom_job_number?.startsWith(prefix)) {
-                    const n = parseInt(custom_job_number.replace(prefix, ''));
-                    if (!isNaN(n) && n > last_seq) last_seq = n;
+            const check = (num) => {
+                if (num && String(num).startsWith(prefix)) {
+                    const n = parseInt(String(num).slice(prefix.length), 10);
+                    if (!isNaN(n) && n > last_seq) last_seq = n;   
                 }
-            });
+            };
 
-            frappe.model.set_value(cdt, cdn, 'custom_job_number', `${prefix}${String(last_seq + 1).padStart(2, '0')}`);
+            (message || []).forEach(r => check(r.custom_job_number));       
+            (frm.doc.items || []).forEach(r => check(r.custom_job_number)); 
+
+            frappe.model.set_value(
+                cdt, cdn, 'custom_job_number',
+                `${prefix}${String(last_seq + 1).padStart(2, '0')}`
+            );
         }
     });
 }
