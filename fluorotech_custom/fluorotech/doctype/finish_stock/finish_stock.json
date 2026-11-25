@@ -1,0 +1,169 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "FS-.YYYY.-.###",
+ "creation": "2026-11-25 15:29:04.688132",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_crxg",
+  "amended_from",
+  "item_to_transfer",
+  "item_description",
+  "drawing_no",
+  "column_break_yhmo",
+  "od",
+  "id",
+  "length",
+  "combine_material_name",
+  "section_break_psmt",
+  "get_sales_orders",
+  "sales_orders",
+  "prod_plan_references",
+  "section_break_uxsm",
+  "get_finished_goods_for_manufacture",
+  "consolidate_sales_order_items",
+  "po_items"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_crxg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Finish Stock",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "item_to_transfer",
+   "fieldtype": "Link",
+   "label": "Item To Transfer",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_yhmo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_item_od",
+   "fieldname": "od",
+   "fieldtype": "Data",
+   "label": "OD",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_item_id",
+   "fieldname": "id",
+   "fieldtype": "Data",
+   "label": "ID",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_length",
+   "fieldname": "length",
+   "fieldtype": "Data",
+   "label": "Length",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_combine_material_name",
+   "fieldname": "combine_material_name",
+   "fieldtype": "Data",
+   "label": "Combine Material Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_drawing_no",
+   "fieldname": "drawing_no",
+   "fieldtype": "Data",
+   "label": "Drawing No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_psmt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "get_sales_orders",
+   "fieldtype": "Button",
+   "label": "Get Sales Orders"
+  },
+  {
+   "fieldname": "sales_orders",
+   "fieldtype": "Table",
+   "label": "Sales Orders",
+   "options": "Production Plan Sales Order"
+  },
+  {
+   "fieldname": "section_break_uxsm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "get_finished_goods_for_manufacture",
+   "fieldtype": "Button",
+   "label": "Get Finished Goods for Manufacture"
+  },
+  {
+   "fieldname": "po_items",
+   "fieldtype": "Table",
+   "label": "PO Items",
+   "options": "Production Plan Item"
+  },
+  {
+   "default": "0",
+   "fieldname": "consolidate_sales_order_items",
+   "fieldtype": "Check",
+   "label": "Consolidate Sales Order Items"
+  },
+  {
+   "fieldname": "prod_plan_references",
+   "fieldtype": "Table",
+   "hidden": 1,
+   "label": "Production Plan Reference",
+   "options": "Production Plan Item Reference"
+  },
+  {
+   "fetch_from": "item_to_transfer.description",
+   "fieldname": "item_description",
+   "fieldtype": "Text Editor",
+   "label": "Item Description",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-11-25 16:24:56.269200",
+ "modified_by": "Administrator",
+ "module": "Fluorotech",
+ "name": "Finish Stock",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
