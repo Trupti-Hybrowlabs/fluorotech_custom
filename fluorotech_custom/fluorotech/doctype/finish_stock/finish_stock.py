@@ -9,12 +9,15 @@ from pypika.terms import ExistsCriterion
 
 from erpnext.manufacturing.doctype.work_order.work_order import get_item_details
 
+SOURCE_WAREHOUSE = "Finish Stock Store – FEPL"
+TARGET_WAREHOUSE = "Under Quality Inspection - FEPL"
+
 
 class FinishStock(Document):
 	# ---------- Step 1: Get Sales Orders ----------
 	@frappe.whitelist()
 	def get_open_sales_orders(self):
-		"""item_to_transfer ke liye jitne open Sales Orders hain wo table me bharta hai"""
+		"""Fill the Sales Orders table with open Sales Orders for item_to_transfer."""
 		if not self.item_to_transfer:
 			frappe.throw(_("Please select Item To Transfer first"))
 
@@ -183,12 +186,16 @@ class FinishStock(Document):
 			pi._set_defaults()
 			pi.sales_order = data.parent
 			pi.sales_order_item = data.name
+			self.set_job_details(pi, [data.name])
 
 		if refs:
 			for po_item in self.po_items:
 				po_item.planned_qty = refs[po_item.bom_no]["qty"]
 				po_item.pending_qty = refs[po_item.bom_no]["qty"]
 				po_item.sales_order = ""
+				self.set_job_details(
+					po_item, [d["sales_order_item"] for d in refs[po_item.bom_no]["so_details"]]
+				)
 			if not self.meta.get_field("prod_plan_references"):
 				frappe.msgprint(
 					_("Field 'prod_plan_references' is missing in Finish Stock doctype, so Sales Order references were not saved."),
@@ -207,5 +214,137 @@ class FinishStock(Document):
 						},
 					)
 
+	def set_job_details(self, row, so_item_names):
+		"""Set custom_job_number and custom_pos_no on the row from Sales Order Item."""
+		job_numbers, pos_nos = [], []
+		for name in so_item_names:
+			if not name:
+				continue
+			values = frappe.db.get_value(
+				"Sales Order Item", name, ["custom_job_number", "custom_pos_no"], as_dict=True
+			)
+			if not values:
+				continue
+			if values.custom_job_number and values.custom_job_number not in job_numbers:
+				job_numbers.append(values.custom_job_number)
+			if values.custom_pos_no and values.custom_pos_no not in pos_nos:
+				pos_nos.append(values.custom_pos_no)
+
+		row.custom_job_number = ", ".join(job_numbers)
+		row.custom_pos_no = ", ".join(pos_nos)
+
 	def calculate_total_planned_qty(self):
 		self.total_planned_qty = sum(flt(d.planned_qty) for d in self.po_items)
+
+	def on_submit(self):
+		self.make_material_transfer()
+
+	def on_cancel(self):
+		self.cancel_material_transfer()
+
+	def make_material_transfer(self):
+		"""Create and submit a Material Transfer Stock Entry for all po_items rows."""
+		for warehouse in (SOURCE_WAREHOUSE, TARGET_WAREHOUSE):
+			if not frappe.db.exists("Warehouse", warehouse):
+				frappe.throw(_("Warehouse {0} does not exist").format(frappe.bold(warehouse)))
+
+		rows = [d for d in self.po_items if flt(d.planned_qty) > 0]
+		if not rows:
+			frappe.throw(_("No items with quantity found in PO Items to transfer"))
+
+		company = frappe.db.get_value("Warehouse", SOURCE_WAREHOUSE, "company")
+
+		se = frappe.new_doc("Stock Entry")
+		se.stock_entry_type = "Material Transfer"
+		se.purpose = "Material Transfer"
+		se.company = company
+		se.from_warehouse = SOURCE_WAREHOUSE
+		se.to_warehouse = TARGET_WAREHOUSE
+		se.custom_finish_stock = self.name
+		se.remarks = _("Auto-created from Finish Stock {0}").format(self.name)
+
+		for row in rows:
+			se.append(
+				"items",
+				{
+					"item_code": row.item_code,
+					"qty": flt(row.planned_qty),
+					"uom": row.stock_uom,
+					"stock_uom": row.stock_uom,
+					"conversion_factor": 1,
+					"s_warehouse": SOURCE_WAREHOUSE,
+					"t_warehouse": TARGET_WAREHOUSE,
+					"sales_order": row.sales_order or None,
+				},
+			)
+
+		se.set_missing_values()
+		se.insert()
+		se.submit()
+
+		self.make_quality_inspections(se)
+
+		if self.meta.get_field("stock_entry"):
+			self.db_set("stock_entry", se.name)
+
+		frappe.msgprint(
+			_("Stock Entry {0} created").format(frappe.utils.get_link_to_form("Stock Entry", se.name)),
+			alert=True,
+		)
+
+	def make_quality_inspections(self, se):
+		"""Create and submit one Quality Inspection per Stock Entry item row."""
+		qi_names = []
+		for se_row, fs_row in zip(se.items, [d for d in self.po_items if flt(d.planned_qty) > 0]):
+			qi = frappe.new_doc("Quality Inspection")
+			qi.company = se.company
+			qi.report_date = se.posting_date
+			qi.inspection_type = "In Process"
+			qi.status = "Accepted"
+			qi.reference_type = "Stock Entry"
+			qi.reference_name = se.name
+			qi.child_row_reference = se_row.name
+			qi.custom_finish_stock = self.name
+			qi.item_code = se_row.item_code
+			qi.sample_size = 1
+			qi.inspected_by = frappe.session.user
+			qi.remarks = _("Auto-created from Finish Stock {0}").format(self.name)
+
+			optional_values = {
+				"custom_transfer_warehouse": TARGET_WAREHOUSE,
+				"custom_qty_transfer_to_quality": flt(se_row.qty),
+				"custom_job_no": fs_row.get("custom_job_number"),
+				"custom_drawing_no": self.get("drawing_no"),
+			}
+			for fieldname, value in optional_values.items():
+				if value and qi.meta.get_field(fieldname):
+					qi.set(fieldname, value)
+
+			qi.insert()
+			qi.submit()
+			qi_names.append(qi.name)
+
+		if qi_names:
+			frappe.msgprint(
+				_("Quality Inspection {0} created").format(
+					", ".join(frappe.utils.get_link_to_form("Quality Inspection", n) for n in qi_names)
+				),
+				alert=True,
+			)
+
+	def cancel_material_transfer(self):
+		"""Cancel the Stock Entry (and its Quality Inspections) created on submit."""
+		for qi in frappe.get_all(
+			"Quality Inspection",
+			filters={"custom_finish_stock": self.name, "docstatus": ("<", 2)},
+			fields=["name", "docstatus"],
+		):
+			if qi.docstatus == 1:
+				frappe.get_doc("Quality Inspection", qi.name).cancel()
+			else:
+				frappe.delete_doc("Quality Inspection", qi.name)
+
+		for se in frappe.get_all(
+			"Stock Entry", filters={"custom_finish_stock": self.name, "docstatus": 1}, pluck="name"
+		):
+			frappe.get_doc("Stock Entry", se).cancel()
