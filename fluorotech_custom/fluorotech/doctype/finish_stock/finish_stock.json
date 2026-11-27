@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "FS-.YYYY.-.###",
+ "autoname": "WO-FS-.YY.-.MM.-.###",
  "creation": "2026-11-25 15:29:04.688132",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -11,11 +11,13 @@
   "item_to_transfer",
   "item_description",
   "drawing_no",
+  "combine_material_name",
   "column_break_yhmo",
   "od",
   "id",
   "length",
-  "combine_material_name",
+  "width",
+  "thickness",
   "section_break_psmt",
   "get_sales_orders",
   "sales_orders",
@@ -134,6 +136,20 @@
    "fieldtype": "Text Editor",
    "label": "Item Description",
    "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_width",
+   "fieldname": "width",
+   "fieldtype": "Data",
+   "label": "Width",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_to_transfer.custom_thickness",
+   "fieldname": "thickness",
+   "fieldtype": "Data",
+   "label": "Thickness",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -149,7 +165,7 @@
    "link_fieldname": "custom_finish_stock"
   }
  ],
- "modified": "2026-11-27 11:31:34.556783",
+ "modified": "2026-11-27 15:01:45.011510",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Finish Stock",

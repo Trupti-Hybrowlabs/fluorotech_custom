@@ -172,7 +172,7 @@ class FinishStock(Document):
 			pi = self.append(
 				"po_items",
 				{
-					"warehouse": data.warehouse,
+					"warehouse": SOURCE_WAREHOUSE,
 					"item_code": data.item_code,
 					"description": data.description or (item_details and item_details.description),
 					"stock_uom": (item_details and item_details.stock_uom) or "",
@@ -351,9 +351,29 @@ class FinishStock(Document):
 		):
 			frappe.get_doc("Stock Entry", se).cancel()
 
+def _update_finish_stock_accepted_qty(doc):
+	fs = frappe.get_doc("Finish Stock", doc.custom_finish_stock)
+	rows = [r for r in fs.po_items if r.item_code == doc.item_code]
+	if not rows:
+		return
+
+	row = rows[0]
+	if len(rows) > 1:
+		idx = frappe.db.get_value("Stock Entry Detail", doc.get("child_row_reference"), "idx")
+		if idx and 0 < idx <= len(fs.po_items):
+			row = fs.po_items[idx - 1]
+
+	accepted = flt(doc.get("custom_accepted_qty"))
+	frappe.db.set_value("Production Plan Item", row.name, "planned_qty", accepted, update_modified=False)
+
+	if frappe.get_meta("Finish Stock").has_field("total_planned_qty"):
+		total = sum(accepted if d.name == row.name else flt(d.planned_qty) for d in fs.po_items)
+		frappe.db.set_value("Finish Stock", fs.name, "total_planned_qty", total, update_modified=False)
+
 def on_quality_inspection_submit(doc, method=None):
 	if not doc.get("custom_finish_stock"):
 		return
+	_update_finish_stock_accepted_qty(doc)
 	if flt(doc.get("custom_rejection_qty")) <= 0:
 		return
 
