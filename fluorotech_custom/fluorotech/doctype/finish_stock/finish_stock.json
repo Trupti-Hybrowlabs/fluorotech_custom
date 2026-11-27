@@ -139,8 +139,17 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-11-25 16:24:56.269200",
+ "links": [
+  {
+   "link_doctype": "Stock Entry",
+   "link_fieldname": "custom_finish_stock"
+  },
+  {
+   "link_doctype": "Quality Inspection",
+   "link_fieldname": "custom_finish_stock"
+  }
+ ],
+ "modified": "2026-11-27 11:31:34.556783",
  "modified_by": "Administrator",
  "module": "Fluorotech",
  "name": "Finish Stock",
