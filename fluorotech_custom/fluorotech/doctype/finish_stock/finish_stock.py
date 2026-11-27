@@ -17,7 +17,6 @@ class FinishStock(Document):
 	# ---------- Step 1: Get Sales Orders ----------
 	@frappe.whitelist()
 	def get_open_sales_orders(self):
-		"""Fill the Sales Orders table with open Sales Orders for item_to_transfer."""
 		if not self.item_to_transfer:
 			frappe.throw(_("Please select Item To Transfer first"))
 
@@ -293,8 +292,10 @@ class FinishStock(Document):
 		)
 
 	def make_quality_inspections(self, se):
-		"""Create and submit one Quality Inspection per Stock Entry item row."""
 		qi_names = []
+		customers = ", ".join(
+			dict.fromkeys(d.customer for d in self.get("sales_orders") if d.customer)
+		)
 		for se_row, fs_row in zip(se.items, [d for d in self.po_items if flt(d.planned_qty) > 0]):
 			qi = frappe.new_doc("Quality Inspection")
 			qi.company = se.company
@@ -313,7 +314,10 @@ class FinishStock(Document):
 			optional_values = {
 				"custom_transfer_warehouse": TARGET_WAREHOUSE,
 				"custom_qty_transfer_to_quality": flt(se_row.qty),
+				"custom_received_qty": flt(se_row.qty),
+				"custom_accepted_qty": flt(se_row.qty),
 				"custom_job_no": fs_row.get("custom_job_number"),
+				"custom_customer_name": customers,
 				"custom_drawing_no": self.get("drawing_no"),
 			}
 			for fieldname, value in optional_values.items():
@@ -321,7 +325,6 @@ class FinishStock(Document):
 					qi.set(fieldname, value)
 
 			qi.insert()
-			qi.submit()
 			qi_names.append(qi.name)
 
 		if qi_names:
@@ -333,7 +336,6 @@ class FinishStock(Document):
 			)
 
 	def cancel_material_transfer(self):
-		"""Cancel the Stock Entry (and its Quality Inspections) created on submit."""
 		for qi in frappe.get_all(
 			"Quality Inspection",
 			filters={"custom_finish_stock": self.name, "docstatus": ("<", 2)},
@@ -348,3 +350,105 @@ class FinishStock(Document):
 			"Stock Entry", filters={"custom_finish_stock": self.name, "docstatus": 1}, pluck="name"
 		):
 			frappe.get_doc("Stock Entry", se).cancel()
+
+def on_quality_inspection_submit(doc, method=None):
+	if not doc.get("custom_finish_stock"):
+		return
+	if flt(doc.get("custom_rejection_qty")) <= 0:
+		return
+
+	accepted = flt(doc.get("custom_accepted_qty"))
+
+	old_se_name = frappe.db.get_value(
+		"Stock Entry",
+		{"custom_finish_stock": doc.custom_finish_stock, "docstatus": 1},
+		"name",
+		order_by="creation desc",
+	)
+	if not old_se_name:
+		return
+	old_se = frappe.get_doc("Stock Entry", old_se_name)
+
+	target = next((r for r in old_se.items if r.name == doc.get("child_row_reference")), None) or next(
+		(r for r in old_se.items if r.item_code == doc.item_code), None
+	)
+	if not target:
+		return
+
+	if accepted > flt(target.qty):
+		frappe.throw(
+			_("Accepted Qty {0} cannot be more than the transferred qty {1}").format(accepted, flt(target.qty))
+		)
+	if accepted == flt(target.qty):
+		return
+
+	new_rows = []
+	for r in old_se.items:
+		qty = accepted if r.name == target.name else flt(r.qty)
+		if qty <= 0:
+			continue
+		new_rows.append(
+			(
+				r.name,
+				{
+					"item_code": r.item_code,
+					"qty": qty,
+					"uom": r.uom,
+					"stock_uom": r.stock_uom,
+					"conversion_factor": flt(r.conversion_factor) or 1,
+					"s_warehouse": r.s_warehouse,
+					"t_warehouse": r.t_warehouse,
+					"sales_order": r.get("sales_order") or None,
+				},
+			)
+		)
+
+	old_se.flags.ignore_links = True
+	old_se.cancel()
+
+	if not new_rows:
+		frappe.msgprint(
+			_("Stock Entry {0} cancelled. Accepted Qty is 0, so no new Stock Entry was created.").format(
+				old_se.name
+			),
+			alert=True,
+		)
+		return
+
+	se = frappe.new_doc("Stock Entry")
+	se.stock_entry_type = "Material Transfer"
+	se.purpose = "Material Transfer"
+	se.company = old_se.company
+	se.from_warehouse = old_se.from_warehouse
+	se.to_warehouse = old_se.to_warehouse
+	se.custom_finish_stock = doc.custom_finish_stock
+	se.remarks = _("Re-created from Finish Stock {0} after Quality Inspection {1}").format(
+		doc.custom_finish_stock, doc.name
+	)
+	for _old_name, row in new_rows:
+		se.append("items", row)
+	se.set_missing_values()
+	se.insert()
+	se.submit()
+
+	row_map = {old_name: new_row.name for (old_name, _row), new_row in zip(new_rows, se.items)}
+	for qi in frappe.get_all(
+		"Quality Inspection",
+		filters={"reference_type": "Stock Entry", "reference_name": old_se.name, "docstatus": ("<", 2)},
+		pluck="name",
+	):
+		old_ref = frappe.db.get_value("Quality Inspection", qi, "child_row_reference")
+		values = {"reference_name": se.name}
+		if old_ref in row_map:
+			values["child_row_reference"] = row_map[old_ref]
+		frappe.db.set_value("Quality Inspection", qi, values, update_modified=False)
+
+	if frappe.get_meta("Finish Stock").has_field("stock_entry"):
+		frappe.db.set_value("Finish Stock", doc.custom_finish_stock, "stock_entry", se.name, update_modified=False)
+
+	frappe.msgprint(
+		_("Stock Entry {0} cancelled and {1} created with accepted qty").format(
+			old_se.name, frappe.utils.get_link_to_form("Stock Entry", se.name)
+		),
+		alert=True,
+	)

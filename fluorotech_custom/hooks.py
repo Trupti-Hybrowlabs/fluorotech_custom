@@ -70,6 +70,9 @@ doctype_js = {
 doc_events = {
     "Work Order": {
         "before_insert": "fluorotech_custom.config.py.work_order.set_job_number_from_pp"
+    },
+    "Quality Inspection": {
+        "on_submit": "fluorotech_custom.fluorotech.doctype.finish_stock.finish_stock.on_quality_inspection_submit"
     }
 }
 
